@@ -1,0 +1,3 @@
+[submodule "components/esp-serial-flasher"]
+	path = components/esp-serial-flasher
+	url = ../../espressif/esp-serial-flasher.git
