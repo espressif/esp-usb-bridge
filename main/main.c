@@ -26,6 +26,9 @@
 #include "driver/periph_ctrl.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
+#include "esp_system.h"
+
+static const char *TAG = "bridge_main";
 
 #define EPNUM_CDC       2
 #define EPNUM_VENDOR    3
@@ -72,12 +75,16 @@ static uint8_t const desc_configuration[] = {
     TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, 6, EPNUM_MSC, 0x80 | EPNUM_MSC, 64),
 };
 
+#define MAC_BYTES       6
+
+static char serial_descriptor[MAC_BYTES * 2 + 1] = {'\0'}; // 2 chars per hexnumber + '\0'
+
 static char const *string_desc_arr[] =
 {
     (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
     "Espressif Systems Co. Ltd.",  // 1: Manufacturer
     CONFIG_BRIDGE_PRODUCT_NAME,    // 2: Product
-    "123456",                      // 3: Serials, should use chip ID
+    serial_descriptor,             // 3: Serials
     "CDC",
     "JTAG",
     "MSC",
@@ -93,6 +100,20 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index)
 uint8_t const *tud_descriptor_device_cb(void)
 {
     return (uint8_t const *) &descriptor_config;
+}
+
+static void init_serial_no()
+{
+    uint8_t m[MAC_BYTES] = {0};
+    esp_err_t ret = esp_efuse_mac_get_default(m);
+
+    if (ret != ESP_OK) {
+        ESP_LOGD(TAG, "Cannot read MAC address and set the device serial number");
+        abort();
+    }
+
+    snprintf(serial_descriptor, sizeof(serial_descriptor),
+        "%02X%02X%02X%02X%02X%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
 uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
@@ -162,6 +183,8 @@ static void tusb_device_task(void *pvParameters)
 
 void app_main(void)
 {
+    init_serial_no();
+
     periph_module_reset(PERIPH_USB_MODULE);
     periph_module_enable(PERIPH_USB_MODULE);
 
