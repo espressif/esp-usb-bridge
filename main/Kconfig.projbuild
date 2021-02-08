@@ -40,6 +40,18 @@ menu "Bridge Configuration"
         int "GPIO pin for the TMS signal"
         default 8
 
+    config BRIDGE_GPIO_LED1
+        int "GPIO pin LED1"
+        default 12
+
+    config BRIDGE_GPIO_LED2
+        int "GPIO pin LED2"
+        default 13
+
+    config BRIDGE_GPIO_LED3
+        int "GPIO pin LED3"
+        default 14
+
     config BRIDGE_MSC_VOLUME_LABEL
         string "Volume label shown in the MSC disc"
         default "ESPPROG_MSC"

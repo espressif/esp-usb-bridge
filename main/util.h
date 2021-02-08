@@ -17,3 +17,11 @@
 #include <sys/param.h>
 
 #define GET_BYTE(n, b)          (((n) >> ((b) * 8)) & 0xFF)
+
+#define EUB_ASSERT(condition)            do {                           \
+                                                if (!(condition)) {     \
+                                                    eub_abort();        \
+                                                }                       \
+                                            } while(0)
+
+void __attribute__((noreturn)) eub_abort(void);

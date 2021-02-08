@@ -399,16 +399,19 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
             if (p->payload_size > msc_chunk_size) {
                 ESP_LOGE(TAG, "UF2 block %d is of size %d and should be at most %d", p->block_no, p->payload_size,
                         msc_chunk_size);
+                eub_abort();
             }
 
             if (p->blocks != msc_blocks) {
                 ESP_LOGE(TAG, "UF2 block %d has %d as total block number but it should be %d", p->block_no, p->blocks,
                         msc_blocks);
+                eub_abort();
             }
 
             if (esp_loader_flash_write((void *) p->data, p->payload_size) != ESP_LOADER_SUCCESS) {
                 ESP_LOGE(TAG, "UF2 block %d of %d could not be written at %#08x with length %d", p->block_no, p->blocks,
                     p->addr, p->payload_size);
+                eub_abort();
             }
 
             ESP_LOGD(TAG, "ESP LOADER flash write success!");
@@ -443,7 +446,7 @@ int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, u
             break;
 
         default:
-            ESP_LOGE(TAG, "tud_msc_scsi_cb() invoked: %d", scsi_cmd[0]);
+            ESP_LOGW(TAG, "tud_msc_scsi_cb() invoked: %d", scsi_cmd[0]);
 
             tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0x00);
 

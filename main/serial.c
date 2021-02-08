@@ -24,6 +24,7 @@
 #include "esp_loader.h"
 #include "esp32_port.h"
 #include "esp_timer.h"
+#include "util.h"
 
 #define GPIO_BOOT    CONFIG_BRIDGE_GPIO_BOOT
 #define GPIO_RST     CONFIG_BRIDGE_GPIO_RST
@@ -60,7 +61,7 @@ static void uart_event_task(void *pvParameters)
                         // We cannot wait it here because UART events would overflow and have to copy the data into
                         // another buffer and wait until it can be sent.
                         if (xRingbufferSend(usb_sendbuf, dtmp, read, pdMS_TO_TICKS(10)) != pdTRUE) {
-                            ESP_LOGE(TAG, "Cannot write to ringbuffer (free %d of %d)!",
+                            ESP_LOGW(TAG, "Cannot write to ringbuffer (free %d of %d)!",
                                     xRingbufferGetCurFreeSize(usb_sendbuf),
                                     USB_SEND_RINGBUFFER_SIZE);
                             vTaskDelay(pdMS_TO_TICKS(10));
@@ -129,7 +130,7 @@ void tud_cdc_rx_cb(uint8_t itf)
 {
     if (!serial_init_finished) {
         // This is a callback function which can be invoked without running start_serial_task()
-        ESP_LOGE(TAG, "Tasks for the serial interface hasn't been initialized!");
+        ESP_LOGW(TAG, "Tasks for the serial interface hasn't been initialized!");
         return;
     }
 
@@ -140,10 +141,10 @@ void tud_cdc_rx_cb(uint8_t itf)
 
         const int transferred = uart_write_bytes(SLAVE_UART_NUM, buf, rx_size);
         if (transferred != rx_size) {
-            ESP_LOGE(TAG, "uart_write_bytes transferred %d bytes only!", transferred);
+            ESP_LOGW(TAG, "uart_write_bytes transferred %d bytes only!", transferred);
         }
     } else {
-        ESP_LOGE(TAG, "tud_cdc_rx_cb receive error");
+        ESP_LOGW(TAG, "tud_cdc_rx_cb receive error");
     }
 }
 
@@ -151,7 +152,7 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {
     if (!serial_init_finished) {
         // This is a callback function which can be invoked without running start_serial_task()
-        ESP_LOGE(TAG, "Tasks for the serial interface hasn't been initialized!");
+        ESP_LOGW(TAG, "Tasks for the serial interface hasn't been initialized!");
         return;
     }
 
@@ -232,12 +233,13 @@ void start_serial_task(void *pvParameters)
             xTaskCreate(uart_event_task, "uart_event_task", 8 * 1024, NULL, 5, NULL);
         } else {
             ESP_LOGE(TAG, "Cannot create ringbuffer for USB sender");
-            abort();
+            eub_abort();
         }
         serial_init_finished = true;
         serial_read_enabled = true;
     } else {
         ESP_LOGE(TAG, "loader_port_serial_init failed");
+        eub_abort();
     }
 
     vTaskDelete(NULL);

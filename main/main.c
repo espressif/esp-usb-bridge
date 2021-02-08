@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdlib.h>
+#include "util.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -109,7 +110,7 @@ static void init_serial_no()
 
     if (ret != ESP_OK) {
         ESP_LOGD(TAG, "Cannot read MAC address and set the device serial number");
-        abort();
+        eub_abort();
     }
 
     snprintf(serial_descriptor, sizeof(serial_descriptor),
@@ -181,8 +182,28 @@ static void tusb_device_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
+static void init_led_gpios()
+{
+    gpio_config_t io_conf = {};
+    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = (1UL << CONFIG_BRIDGE_GPIO_LED1) | (1UL << CONFIG_BRIDGE_GPIO_LED2) |
+        (1UL << CONFIG_BRIDGE_GPIO_LED3);
+    io_conf.pull_down_en = 0;
+    io_conf.pull_up_en = 0;
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+    gpio_set_level(CONFIG_BRIDGE_GPIO_LED1, 1);
+    gpio_set_level(CONFIG_BRIDGE_GPIO_LED2, 1);
+    gpio_set_level(CONFIG_BRIDGE_GPIO_LED3, 1);
+
+    ESP_LOGI(TAG, "LED GPIO init done");
+}
+
 void app_main(void)
 {
+    init_led_gpios(); // Keep this at the begining. LEDs are used for error reporting.
+
     init_serial_no();
 
     periph_module_reset(PERIPH_USB_MODULE);

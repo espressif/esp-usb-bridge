@@ -48,7 +48,7 @@ static inline uint8_t *alloc_with_abort(const char *field_name, int size)
     uint8_t *f = malloc(size * sizeof(uint8_t));
     if (!f) {
         ESP_LOGE(TAG, "Cannot allocate %d bytes for %s!", size, field_name);
-        abort();
+        eub_abort();
     }
     return f;
 }
@@ -83,6 +83,7 @@ static void usb_reader_task(void *pvParameters)
                 if (xRingbufferSend(usb_rcvbuf, buf, r, pdMS_TO_TICKS(1000)) != pdTRUE) {
                     ESP_LOGE(TAG, "Cannot write to usb_rcvbuf ringbuffer (free %d of %d)!",
                             xRingbufferGetCurFreeSize(usb_rcvbuf), USB_RCVBUF_SIZE);
+                    eub_abort();
                 }
             }
 
@@ -216,23 +217,23 @@ void jtag_task(void *pvParameters)
     usb_rcvbuf = xRingbufferCreate(USB_RCVBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
     if (!usb_rcvbuf) {
         ESP_LOGE(TAG, "Cannot allocate USB receive buffer!");
-        abort();
+        eub_abort();
     }
 
     if (xTaskCreate(usb_reader_task, "usb_reader_task", 4 * 1024, NULL, uxTaskPriorityGet(NULL) - 1, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Cannot create USB reader task!");
-        abort();
+        eub_abort();
     }
 
     usb_sndbuf = xRingbufferCreate(USB_SNDBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
     if (!usb_sndbuf) {
         ESP_LOGE(TAG, "Cannot allocate USB send buffer!");
-        abort();
+        eub_abort();
     }
 
     if (xTaskCreate(usb_send_task, "usb_send_task", 4 * 1024, NULL, uxTaskPriorityGet(NULL) - 1, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Cannot create USB send task!");
-        abort();
+        eub_abort();
     }
 
     while (1) {
