@@ -1,8 +1,16 @@
 menu "Bridge Configuration"
 
+    config BRIDGE_USB_VID
+        hex "USB vendor ID"
+        default 0x303A
+
     config BRIDGE_USB_PID
         hex "USB product ID"
         default 0x1002
+
+    config BRIDGE_MANUFACTURER
+        string "USB bridge manufacturer"
+        default "Espressif Systems Co. Ltd."
 
     config BRIDGE_PRODUCT_NAME
         string "USB product name"

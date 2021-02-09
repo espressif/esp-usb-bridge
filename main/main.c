@@ -53,7 +53,7 @@ static tusb_desc_device_t descriptor_config = {
     .bDeviceSubClass = MISC_SUBCLASS_COMMON,
     .bDeviceProtocol = MISC_PROTOCOL_IAD,
     .bMaxPacketSize0 = CFG_TUD_ENDOINT0_SIZE,
-    .idVendor = 0x303A,
+    .idVendor = CONFIG_BRIDGE_USB_VID,
     .idProduct = CONFIG_BRIDGE_USB_PID,
     .bcdDevice = 0x100,
     .iManufacturer = 0x01,
@@ -83,7 +83,7 @@ static char serial_descriptor[MAC_BYTES * 2 + 1] = {'\0'}; // 2 chars per hexnum
 static char const *string_desc_arr[] =
 {
     (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
-    "Espressif Systems Co. Ltd.",  // 1: Manufacturer
+    CONFIG_BRIDGE_MANUFACTURER,    // 1: Manufacturer
     CONFIG_BRIDGE_PRODUCT_NAME,    // 2: Product
     serial_descriptor,             // 3: Serials
     "CDC",
