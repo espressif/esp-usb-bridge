@@ -58,13 +58,13 @@ static void init_jtag_gpio()
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1UL << GPIO_TDO) | (1UL << GPIO_TCK) | (1UL << GPIO_TMS);
+    io_conf.pin_bit_mask = (1ULL << GPIO_TDO) | (1ULL << GPIO_TCK) | (1ULL << GPIO_TMS);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1UL << GPIO_TDI);
+    io_conf.pin_bit_mask = (1ULL << GPIO_TDI);
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
     ESP_LOGI(TAG, "JTAG GPIO init done");

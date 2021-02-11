@@ -187,8 +187,8 @@ static void init_led_gpios()
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1UL << CONFIG_BRIDGE_GPIO_LED1) | (1UL << CONFIG_BRIDGE_GPIO_LED2) |
-        (1UL << CONFIG_BRIDGE_GPIO_LED3);
+    io_conf.pin_bit_mask = (1ULL << CONFIG_BRIDGE_GPIO_LED1) | (1ULL << CONFIG_BRIDGE_GPIO_LED2) |
+        (1ULL << CONFIG_BRIDGE_GPIO_LED3);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     ESP_ERROR_CHECK(gpio_config(&io_conf));
