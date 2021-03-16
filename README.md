@@ -93,6 +93,14 @@ The JTAG interface might need some additional setup to work. Please consult the
 [documentation of ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/jtag-debugging/configure-ft2232h-jtag.html)
 for achieving this.
 
+### Known issues
+
+- The watchdogs need to be disabled or the target MCU could be restarted during the halt operation. Watchdogs can be
+  disabled by disabling `CONFIG_ESP_INT_WDT` and `CONFIG_ESP_TASK_WDT` sdkconfig values of the target project (not ESP
+  USB Bridge).
+- The JTAG communication is currently very slow. `set remotetimeout 100` should be set before loading the project
+  binary. The command can be placed into the gdbinit file as the first instruction.
+
 ## Mass Storage Device
 
 A mass storage device will show up in the PC connected to the ESP USB bridge. This can be accessed as any other USB storage

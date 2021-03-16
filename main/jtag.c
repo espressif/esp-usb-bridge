@@ -28,7 +28,7 @@
 #define GPIO_TMS                    CONFIG_BRIDGE_GPIO_TMS
 
 #define USB_RCVBUF_SIZE             1024
-#define USB_SNDBUF_SIZE             1024
+#define USB_SNDBUF_SIZE             16*1024
 
 #define ESP_REMOTE_HEADER_LEN       4
 #define ESP_REMOTE_CMD_VER_1        1
@@ -100,6 +100,7 @@ static void usb_reader_task(void *pvParameters)
 
 static void usb_send_task(void *pvParameters)
 {
+    uint8_t local_buf[CFG_TUD_VENDOR_TX_BUFSIZE];
     for (;;) {
         if (!tud_vendor_n_mounted(0)) {
             ESP_LOGD(TAG, "USB connection is not available!");
@@ -108,7 +109,9 @@ static void usb_send_task(void *pvParameters)
         }
 
         size_t n = 0;
-        uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_sndbuf, &n, portMAX_DELAY, CFG_TUD_VENDOR_TX_BUFSIZE);
+        uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_sndbuf, &n, portMAX_DELAY, sizeof(local_buf));
+        memcpy(local_buf, buf, n);
+        vRingbufferReturnItem(usb_sndbuf, (void *) buf);
         for (int transferred = 0, to_send = n; transferred < n;) {
             int space = tud_vendor_n_write_available(0);
             if (space == 0) {
@@ -123,14 +126,13 @@ static void usb_send_task(void *pvParameters)
                 vTaskDelay(1);
                 continue;
             }
-            const int sent = tud_vendor_n_write(0, buf + transferred, MIN(space, to_send));
+            const int sent = tud_vendor_n_write(0, local_buf + transferred, MIN(space, to_send));
             transferred += sent;
             to_send -= sent;
             ESP_LOGD(TAG, "Space was %d, USB sent %d bytes", space, sent);
-            ESP_LOG_BUFFER_HEXDUMP("USB sent", buf + transferred - sent, sent, ESP_LOG_DEBUG);
+            ESP_LOG_BUFFER_HEXDUMP("USB sent", local_buf + transferred - sent, sent, ESP_LOG_DEBUG);
             // there seems to be no flush for vendor class
         }
-        vRingbufferReturnItem(usb_sndbuf, (void *) buf);
     }
     vTaskDelete(NULL);
 }
@@ -231,7 +233,7 @@ void jtag_task(void *pvParameters)
         eub_abort();
     }
 
-    if (xTaskCreate(usb_send_task, "usb_send_task", 4 * 1024, NULL, uxTaskPriorityGet(NULL) - 1, NULL) != pdPASS) {
+    if (xTaskCreate(usb_send_task, "usb_send_task", 4 * 1024, NULL, uxTaskPriorityGet(NULL) + 1, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Cannot create USB send task!");
         eub_abort();
     }
