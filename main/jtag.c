@@ -35,6 +35,7 @@
 #define ESP_REMOTE_CMD_RESET        1
 #define ESP_REMOTE_CMD_SCAN         2
 #define ESP_REMOTE_CMD_TMS_SEQ      3
+#define ESP_REMOTE_CMD_SET_CLK      4
 
 static const char *TAG = "bridge_jtag";
 
@@ -295,6 +296,18 @@ void jtag_task(void *pvParameters)
 
             const uint8_t buf[] = {0xff}; // 8 TMS=1 is more than enough to return the TAP state to RESET
             cmd_tms_seq(sizeof(buf) * 8, sizeof(buf), buf);
+        } else if (cmd == ESP_REMOTE_CMD_SET_CLK) {
+            size_t speed_size; uint32_t speed;
+            ESP_LOGD(TAG, "Received ESP_REMOTE_CMD_SET_CLK");
+            uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_rcvbuf, &speed_size, portMAX_DELAY, sizeof(int));
+            ESP_LOG_BUFFER_HEXDUMP("received", buf, speed_size, ESP_LOG_DEBUG);
+            if (speed_size == 4) {
+                speed = buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
+                ESP_LOGI(TAG, "jtag clock speed: %d Hz", speed);
+            } else {
+                ESP_LOGE(TAG, "Incorrect adapter speed size!");
+            }
+            vRingbufferReturnItem(usb_rcvbuf, (void *) buf);
         } else {
             ESP_LOGE(TAG, "Received an unsupported command: %d", cmd);
         }
