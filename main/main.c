@@ -52,7 +52,11 @@ static tusb_desc_device_t descriptor_config = {
     .bDeviceClass = TUSB_CLASS_MISC,
     .bDeviceSubClass = MISC_SUBCLASS_COMMON,
     .bDeviceProtocol = MISC_PROTOCOL_IAD,
+#ifdef CFG_TUD_ENDPOINT0_SIZE
+    .bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,
+#else  // earlier versions have a typo in the name
     .bMaxPacketSize0 = CFG_TUD_ENDOINT0_SIZE,
+#endif
     .idVendor = CONFIG_BRIDGE_USB_VID,
     .idProduct = CONFIG_BRIDGE_USB_PID,
     .bcdDevice = 0x100,
