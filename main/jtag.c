@@ -28,7 +28,7 @@
 #define GPIO_TMS                    CONFIG_BRIDGE_GPIO_TMS
 
 #define USB_RCVBUF_SIZE             1024
-#define USB_SNDBUF_SIZE             16*1024
+#define USB_SNDBUF_SIZE             32*1024
 
 #define ESP_REMOTE_HEADER_LEN       4
 #define ESP_REMOTE_CMD_VER_1        1
