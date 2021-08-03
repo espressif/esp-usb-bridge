@@ -197,9 +197,9 @@ static void init_led_gpios()
     io_conf.pull_up_en = 0;
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
-    gpio_set_level(CONFIG_BRIDGE_GPIO_LED1, 1);
-    gpio_set_level(CONFIG_BRIDGE_GPIO_LED2, 1);
-    gpio_set_level(CONFIG_BRIDGE_GPIO_LED3, 1);
+    gpio_set_level(CONFIG_BRIDGE_GPIO_LED1, !CONFIG_BRIDGE_GPIO_LED1_ACTIVE);
+    gpio_set_level(CONFIG_BRIDGE_GPIO_LED2, !CONFIG_BRIDGE_GPIO_LED2_ACTIVE);
+    gpio_set_level(CONFIG_BRIDGE_GPIO_LED3, !CONFIG_BRIDGE_GPIO_LED3_ACTIVE);
 
     ESP_LOGI(TAG, "LED GPIO init done");
 }

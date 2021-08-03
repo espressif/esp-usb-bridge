@@ -19,16 +19,25 @@
 #include "util.h"
 #include "sdkconfig.h"
 
+#define LED1_ON       CONFIG_BRIDGE_GPIO_LED1_ACTIVE
+#define LED1_OFF    (!CONFIG_BRIDGE_GPIO_LED1_ACTIVE)
+
+#define LED2_ON       CONFIG_BRIDGE_GPIO_LED2_ACTIVE
+#define LED2_OFF    (!CONFIG_BRIDGE_GPIO_LED2_ACTIVE)
+
+#define LED3_ON       CONFIG_BRIDGE_GPIO_LED3_ACTIVE
+#define LED3_OFF    (!CONFIG_BRIDGE_GPIO_LED3_ACTIVE)
+
 void __attribute__((noreturn)) eub_abort(void)
 {
     const int led_patterns[][3] = {
-        {0, 0, 0},
-        {0, 1, 0},
-        {1, 0, 1},
-        {0, 1, 0},
-        {1, 0, 1},
-        {0, 1, 0},
-        {0, 0, 0},
+        {LED1_ON,  LED2_ON,  LED3_ON},
+        {LED1_ON,  LED2_OFF, LED3_ON},
+        {LED1_OFF, LED2_ON,  LED3_OFF},
+        {LED1_ON,  LED2_OFF, LED3_ON},
+        {LED1_OFF, LED2_ON,  LED3_OFF},
+        {LED1_ON,  LED2_OFF, LED3_ON},
+        {LED1_ON,  LED2_ON,  LED3_ON},
     };
 
     for (int i = 0; i < sizeof(led_patterns)/sizeof(led_patterns[0]); ++i) {
