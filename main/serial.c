@@ -101,7 +101,7 @@ static void uart_event_task(void *pvParameters)
 static void usb_sender_task(void *pvParameters)
 {
     while (1) {
-        size_t ringbuf_received;
+        size_t ringbuf_received, try_cnt = 0;
         uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_sendbuf, &ringbuf_received, pdMS_TO_TICKS(100),
                 CONFIG_USB_CDC_TX_BUFSIZE);
 
@@ -111,10 +111,18 @@ static void usb_sender_task(void *pvParameters)
             vRingbufferReturnItem(usb_sendbuf, (void *) buf);
 
             for (int transferred = 0, to_send = ringbuf_received; transferred < ringbuf_received;) {
+                /* try_cnt is used to detect whether usb-cdc buffer is consuming by the host.
+                    this will prevent to stuck here when idf monitor is not running */
+                if (tud_cdc_write_available() < to_send && ++try_cnt < 10) {
+                    tud_cdc_write_flush();
+                    ets_delay_us(100);
+                    continue;
+                }
                 const int t = tud_cdc_write(int_buf + transferred, to_send);
                 ESP_LOGD(TAG, "CDC ringbuffer -> CDC (%d bytes)", t);
                 transferred += t;
                 to_send -= t;
+                try_cnt = 0;
             }
             tud_cdc_write_flush();
         } else {
@@ -155,7 +163,6 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
         ESP_LOGW(TAG, "Tasks for the serial interface hasn't been initialized!");
         return;
     }
-
     // The following transformation of DTR & RTS signals to BOOT & RST is done based on auto reset circutry shown in
     // schematics of ESP boards.
 
