@@ -32,7 +32,7 @@
 #define GPIO_TXD     CONFIG_BRIDGE_GPIO_TXD
 
 #define SLAVE_UART_NUM          UART_NUM_1
-#define SLAVE_UART_BUF_SIZE     (2 * 1024)
+#define SLAVE_UART_BUF_SIZE     (4 * 1024)
 
 #define USB_SEND_RINGBUFFER_SIZE SLAVE_UART_BUF_SIZE
 
@@ -117,6 +117,9 @@ static void usb_sender_task(void *pvParameters)
                     tud_cdc_write_flush();
                     ets_delay_us(100);
                     continue;
+                }
+                if (try_cnt >= 10) {
+                    tud_cdc_write_clear();
                 }
                 const int t = tud_cdc_write(int_buf + transferred, to_send);
                 ESP_LOGD(TAG, "CDC ringbuffer -> CDC (%d bytes)", t);
