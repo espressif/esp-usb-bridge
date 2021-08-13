@@ -25,6 +25,7 @@
 #include "esp32_port.h"
 #include "esp_timer.h"
 #include "util.h"
+#include "serial.h"
 
 #define GPIO_BOOT    CONFIG_BRIDGE_GPIO_BOOT
 #define GPIO_RST     CONFIG_BRIDGE_GPIO_RST
@@ -33,6 +34,7 @@
 
 #define SLAVE_UART_NUM          UART_NUM_1
 #define SLAVE_UART_BUF_SIZE     (2 * 1024)
+#define SLAVE_UART_DEFAULT_BAUD 115200
 
 #define USB_SEND_RINGBUFFER_SIZE SLAVE_UART_BUF_SIZE
 
@@ -52,6 +54,7 @@ static void uart_event_task(void *pvParameters)
 {
     uart_event_t event;
     uint8_t dtmp[SLAVE_UART_BUF_SIZE];
+
     while (1) {
         if (xQueueReceive(uart_queue, (void *) &event, portMAX_DELAY)) {
             switch (event.type) {
@@ -119,7 +122,7 @@ static void usb_sender_task(void *pvParameters)
                        CONFIG_USB_CDC_TX_BUFSIZE);
 
         if (buf) {
-            uint8_t int_buf[ringbuf_received];
+            uint8_t int_buf[CONFIG_USB_CDC_TX_BUFSIZE];
             memcpy(int_buf, buf, ringbuf_received);
             vRingbufferReturnItem(usb_sendbuf, (void *) buf);
 
@@ -179,6 +182,7 @@ void tud_cdc_rx_cb(uint8_t itf)
     const uint32_t rx_size = tud_cdc_n_read(itf, buf, CONFIG_USB_CDC_RX_BUFSIZE);
     if (rx_size > 0) {
         ESP_LOGD(TAG, "CDC -> UART (%d bytes)", rx_size);
+        ESP_LOG_BUFFER_HEXDUMP("CDC -> UART", buf, rx_size, ESP_LOG_DEBUG);
 
         const int transferred = uart_write_bytes(SLAVE_UART_NUM, buf, rx_size);
         if (transferred != rx_size) {
@@ -186,6 +190,15 @@ void tud_cdc_rx_cb(uint8_t itf)
         }
     } else {
         ESP_LOGW(TAG, "tud_cdc_rx_cb receive error");
+    }
+}
+
+void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const *p_line_coding)
+{
+    static int last_bit_rate = -1;
+    if (last_bit_rate != p_line_coding->bit_rate) {
+        serial_set_baudrate(p_line_coding->bit_rate);
+        last_bit_rate = p_line_coding->bit_rate;
     }
 }
 
@@ -226,6 +239,8 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
         gpio_set_level(GPIO_BOOT, boot);
         gpio_set_level(GPIO_RST, rst);
 
+        serial_set_baudrate(SLAVE_UART_DEFAULT_BAUD);
+
         // On ESP32, TDI jtag signal is on GPIO12, which is also a strapping pin that determines flash voltage.
         // If TDI is high when ESP32 is released from external reset, the flash voltage is set to 1.8V, and the chip will fail to boot.
         // As a solution, MTDI signal forced to be low when RST is about to go high.
@@ -260,7 +275,7 @@ static void init_state_change_timer()
 void start_serial_task(void *pvParameters)
 {
     const loader_esp32_config_t serial_conf = {
-        .baud_rate = 115200,
+        .baud_rate = SLAVE_UART_DEFAULT_BAUD,
         .uart_port = SLAVE_UART_NUM,
         .uart_rx_pin = GPIO_RXD,
         .uart_tx_pin = GPIO_TXD,
