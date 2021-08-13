@@ -32,7 +32,7 @@
 #define GPIO_TXD     CONFIG_BRIDGE_GPIO_TXD
 
 #define SLAVE_UART_NUM          UART_NUM_1
-#define SLAVE_UART_BUF_SIZE     (4 * 1024)
+#define SLAVE_UART_BUF_SIZE     (2 * 1024)
 
 #define USB_SEND_RINGBUFFER_SIZE SLAVE_UART_BUF_SIZE
 
@@ -55,8 +55,11 @@ static void uart_event_task(void *pvParameters)
             switch(event.type) {
                 case UART_DATA:
                     if (serial_read_enabled) {
-                        const int read = uart_read_bytes(SLAVE_UART_NUM, dtmp, event.size, portMAX_DELAY);
-                        ESP_LOGD(TAG, "UART -> CDC ringbuffer (%d bytes)", event.size);
+                        size_t buffered_len;
+                        uart_get_buffered_data_len(SLAVE_UART_NUM, &buffered_len);
+                        const int read = uart_read_bytes(SLAVE_UART_NUM, dtmp, MIN(buffered_len, SLAVE_UART_BUF_SIZE), portMAX_DELAY);
+                        ESP_LOGD(TAG, "UART -> CDC ringbuffer (%d bytes)", read);
+                        ESP_LOG_BUFFER_HEXDUMP("UART -> CDC", dtmp, read, ESP_LOG_DEBUG);
 
                         // We cannot wait it here because UART events would overflow and have to copy the data into
                         // another buffer and wait until it can be sent.
@@ -101,7 +104,7 @@ static void uart_event_task(void *pvParameters)
 static void usb_sender_task(void *pvParameters)
 {
     while (1) {
-        size_t ringbuf_received, try_cnt = 0;
+        size_t ringbuf_received;
         uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_sendbuf, &ringbuf_received, pdMS_TO_TICKS(100),
                 CONFIG_USB_CDC_TX_BUFSIZE);
 
@@ -110,7 +113,7 @@ static void usb_sender_task(void *pvParameters)
             memcpy(int_buf, buf, ringbuf_received);
             vRingbufferReturnItem(usb_sendbuf, (void *) buf);
 
-            for (int transferred = 0, to_send = ringbuf_received; transferred < ringbuf_received;) {
+            for (int transferred = 0, try_cnt = 0, to_send = ringbuf_received; transferred < ringbuf_received;) {
                 /* try_cnt is used to detect whether usb-cdc buffer is consuming by the host.
                     this will prevent to stuck here when idf monitor is not running */
                 if (tud_cdc_write_available() < to_send && ++try_cnt < 10) {
@@ -166,6 +169,7 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
         ESP_LOGW(TAG, "Tasks for the serial interface hasn't been initialized!");
         return;
     }
+
     // The following transformation of DTR & RTS signals to BOOT & RST is done based on auto reset circutry shown in
     // schematics of ESP boards.
 
