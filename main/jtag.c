@@ -43,6 +43,8 @@ static uint8_t last_tms = 0;
 static RingbufHandle_t usb_rcvbuf;
 static RingbufHandle_t usb_sndbuf;
 
+bool jtag_tdi_bootstrapping = false;
+
 static inline uint8_t *alloc_with_abort(const char *field_name, int size)
 {
     uint8_t *f = malloc(size * sizeof(uint8_t));
@@ -149,6 +151,10 @@ static int usb_send(const uint8_t *buf, int size)
 
 static void do_jtag(int n_bits, int n_bytes, const uint8_t *tms_bytes, const uint8_t *tdo_bytes, uint8_t *tdi_bytes)
 {
+    if (jtag_tdi_bootstrapping) {
+        return;
+    }
+
     if (tdi_bytes) {
         // the last byte might be incomplete (i.e. when n_bits is not a multiply of 8) so lets initialize it before the
         // loop:
