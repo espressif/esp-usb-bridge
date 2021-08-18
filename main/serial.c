@@ -40,6 +40,8 @@ static const char *TAG = "bridge_serial";
 
 static QueueHandle_t uart_queue;
 static RingbufHandle_t usb_sendbuf;
+static SemaphoreHandle_t usb_tx_requested = NULL;
+static SemaphoreHandle_t usb_tx_done = NULL;
 
 static esp_timer_handle_t state_change_timer;
 
@@ -64,7 +66,7 @@ static void uart_event_task(void *pvParameters)
                         // We cannot wait it here because UART events would overflow and have to copy the data into
                         // another buffer and wait until it can be sent.
                         if (xRingbufferSend(usb_sendbuf, dtmp, read, pdMS_TO_TICKS(10)) != pdTRUE) {
-                            ESP_LOGW(TAG, "Cannot write to ringbuffer (free %d of %d)!",
+                            ESP_LOGV(TAG, "Cannot write to ringbuffer (free %d of %d)!",
                                     xRingbufferGetCurFreeSize(usb_sendbuf),
                                     USB_SEND_RINGBUFFER_SIZE);
                             vTaskDelay(pdMS_TO_TICKS(10));
@@ -101,6 +103,14 @@ static void uart_event_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
+static esp_err_t usb_wait_for_tx(uint32_t block_time_ms)
+{
+    if (xSemaphoreTake(usb_tx_done, pdMS_TO_TICKS(block_time_ms)) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
+    return ESP_OK;
+}
+
 static void usb_sender_task(void *pvParameters)
 {
     while (1) {
@@ -113,24 +123,23 @@ static void usb_sender_task(void *pvParameters)
             memcpy(int_buf, buf, ringbuf_received);
             vRingbufferReturnItem(usb_sendbuf, (void *) buf);
 
-            for (int transferred = 0, try_cnt = 0, to_send = ringbuf_received; transferred < ringbuf_received;) {
-                /* try_cnt is used to detect whether usb-cdc buffer is consuming by the host.
-                    this will prevent to stuck here when idf monitor is not running */
-                if (tud_cdc_write_available() < to_send && ++try_cnt < 10) {
-                    tud_cdc_write_flush();
-                    ets_delay_us(100);
-                    continue;
+            for (int transferred = 0, to_send = ringbuf_received; transferred < ringbuf_received;) {
+                xSemaphoreGive(usb_tx_requested);
+                const int wr_len = tud_cdc_write(int_buf + transferred, to_send);
+                /* tinyusb might have been flushed the data. In case not flushed, we are flushing here.
+                    2nd atttempt might return zero, meaning there is no data to transfer. So it is safe to call it again.
+                */
+                tud_cdc_write_flush();
+                if (usb_wait_for_tx(50) != ESP_OK) {
+                    xSemaphoreTake(usb_tx_requested, 0);
+                    tud_cdc_write_clear(); /* host might be disconnected. drop the buffer */
+                    ESP_LOGV(TAG, "usb tx timeout");
+                    break;
                 }
-                if (try_cnt >= 10) {
-                    tud_cdc_write_clear();
-                }
-                const int t = tud_cdc_write(int_buf + transferred, to_send);
-                ESP_LOGD(TAG, "CDC ringbuffer -> CDC (%d bytes)", t);
-                transferred += t;
-                to_send -= t;
-                try_cnt = 0;
+                ESP_LOGD(TAG, "CDC ringbuffer -> CDC (%d bytes)", wr_len);
+                transferred += wr_len;
+                to_send -= wr_len;
             }
-            tud_cdc_write_flush();
         } else {
             ESP_LOGD(TAG, "usb_sender_task: nothing to send");
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -138,6 +147,24 @@ static void usb_sender_task(void *pvParameters)
         }
     }
     vTaskDelete(NULL);
+}
+
+void tud_cdc_tx_complete_cb(uint8_t itf)
+{
+    if (!serial_init_finished) {
+        // This is a callback function which can be invoked without running start_serial_task()
+        ESP_LOGW(TAG, "Tasks for the serial interface hasn't been initialized!");
+        return;
+    }
+
+    if (xSemaphoreTake(usb_tx_requested, 0) != pdTRUE) {
+        /* Semaphore should have been given before write attempt.
+            Sometimes tinyusb can send one more cb even xfer_complete len is zero
+        */
+        return;
+    }
+
+    xSemaphoreGive(usb_tx_done);
 }
 
 void tud_cdc_rx_cb(uint8_t itf)
@@ -243,6 +270,8 @@ void start_serial_task(void *pvParameters)
         usb_sendbuf = xRingbufferCreate(USB_SEND_RINGBUFFER_SIZE, RINGBUF_TYPE_BYTEBUF);
 
         if (usb_sendbuf) {
+            usb_tx_done = xSemaphoreCreateBinary();
+            usb_tx_requested = xSemaphoreCreateBinary();
             xTaskCreate(usb_sender_task, "usb_sender_task", 4 * 1024, NULL, 5, NULL);
             xTaskCreate(uart_event_task, "uart_event_task", 8 * 1024, NULL, 5, NULL);
         } else {
