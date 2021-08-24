@@ -84,8 +84,7 @@ static uint8_t const desc_configuration[] = {
 
 static char serial_descriptor[MAC_BYTES * 2 + 1] = {'\0'}; // 2 chars per hexnumber + '\0'
 
-static char const *string_desc_arr[] =
-{
+static char const *string_desc_arr[] = {
     (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
     CONFIG_BRIDGE_MANUFACTURER,    // 1: Manufacturer
     CONFIG_BRIDGE_PRODUCT_NAME,    // 2: Product
@@ -118,10 +117,10 @@ static void init_serial_no()
     }
 
     snprintf(serial_descriptor, sizeof(serial_descriptor),
-        "%02X%02X%02X%02X%02X%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
+             "%02X%02X%02X%02X%02X%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
-uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
+uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 {
     uint8_t chr_count;
 
@@ -131,7 +130,7 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
     } else {
         // Convert ASCII string into UTF-16
 
-        if (!(index < sizeof(string_desc_arr)/sizeof(string_desc_arr[0]))) {
+        if (!(index < sizeof(string_desc_arr) / sizeof(string_desc_arr[0]))) {
             return NULL;
         }
 
@@ -143,8 +142,8 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
             chr_count = 31;
         }
 
-        for(uint8_t i = 0; i < chr_count; i++) {
-            _desc_str[1+i] = str[i];
+        for (uint8_t i = 0; i < chr_count; i++) {
+            _desc_str[1 + i] = str[i];
         }
     }
 
@@ -192,7 +191,7 @@ static void init_led_gpios()
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
     io_conf.pin_bit_mask = (1ULL << CONFIG_BRIDGE_GPIO_LED1) | (1ULL << CONFIG_BRIDGE_GPIO_LED2) |
-        (1ULL << CONFIG_BRIDGE_GPIO_LED3);
+                           (1ULL << CONFIG_BRIDGE_GPIO_LED3);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     ESP_ERROR_CHECK(gpio_config(&io_conf));

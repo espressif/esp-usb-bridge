@@ -54,47 +54,47 @@ static void uart_event_task(void *pvParameters)
     uint8_t dtmp[SLAVE_UART_BUF_SIZE];
     while (1) {
         if (xQueueReceive(uart_queue, (void *) &event, portMAX_DELAY)) {
-            switch(event.type) {
-                case UART_DATA:
-                    if (serial_read_enabled) {
-                        size_t buffered_len;
-                        uart_get_buffered_data_len(SLAVE_UART_NUM, &buffered_len);
-                        const int read = uart_read_bytes(SLAVE_UART_NUM, dtmp, MIN(buffered_len, SLAVE_UART_BUF_SIZE), portMAX_DELAY);
-                        ESP_LOGD(TAG, "UART -> CDC ringbuffer (%d bytes)", read);
-                        ESP_LOG_BUFFER_HEXDUMP("UART -> CDC", dtmp, read, ESP_LOG_DEBUG);
+            switch (event.type) {
+            case UART_DATA:
+                if (serial_read_enabled) {
+                    size_t buffered_len;
+                    uart_get_buffered_data_len(SLAVE_UART_NUM, &buffered_len);
+                    const int read = uart_read_bytes(SLAVE_UART_NUM, dtmp, MIN(buffered_len, SLAVE_UART_BUF_SIZE), portMAX_DELAY);
+                    ESP_LOGD(TAG, "UART -> CDC ringbuffer (%d bytes)", read);
+                    ESP_LOG_BUFFER_HEXDUMP("UART -> CDC", dtmp, read, ESP_LOG_DEBUG);
 
-                        // We cannot wait it here because UART events would overflow and have to copy the data into
-                        // another buffer and wait until it can be sent.
-                        if (xRingbufferSend(usb_sendbuf, dtmp, read, pdMS_TO_TICKS(10)) != pdTRUE) {
-                            ESP_LOGV(TAG, "Cannot write to ringbuffer (free %d of %d)!",
-                                    xRingbufferGetCurFreeSize(usb_sendbuf),
-                                    USB_SEND_RINGBUFFER_SIZE);
-                            vTaskDelay(pdMS_TO_TICKS(10));
-                        }
+                    // We cannot wait it here because UART events would overflow and have to copy the data into
+                    // another buffer and wait until it can be sent.
+                    if (xRingbufferSend(usb_sendbuf, dtmp, read, pdMS_TO_TICKS(10)) != pdTRUE) {
+                        ESP_LOGV(TAG, "Cannot write to ringbuffer (free %d of %d)!",
+                                 xRingbufferGetCurFreeSize(usb_sendbuf),
+                                 USB_SEND_RINGBUFFER_SIZE);
+                        vTaskDelay(pdMS_TO_TICKS(10));
                     }
-                    break;
-                case UART_FIFO_OVF:
-                    ESP_LOGW(TAG, "UART FIFO overflow");
-                    uart_flush_input(SLAVE_UART_NUM);
-                    xQueueReset(uart_queue);
-                    break;
-                case UART_BUFFER_FULL:
-                    ESP_LOGW(TAG, "UART ring buffer full");
-                    uart_flush_input(SLAVE_UART_NUM);
-                    xQueueReset(uart_queue);
-                    break;
-                case UART_BREAK:
-                    ESP_LOGW(TAG, "UART RX break");
-                    break;
-                case UART_PARITY_ERR:
-                    ESP_LOGW(TAG, "UART parity error");
-                    break;
-                case UART_FRAME_ERR:
-                    ESP_LOGW(TAG, "UART frame error");
-                    break;
-                default:
-                    ESP_LOGW(TAG, "UART event type: %d", event.type);
-                    break;
+                }
+                break;
+            case UART_FIFO_OVF:
+                ESP_LOGW(TAG, "UART FIFO overflow");
+                uart_flush_input(SLAVE_UART_NUM);
+                xQueueReset(uart_queue);
+                break;
+            case UART_BUFFER_FULL:
+                ESP_LOGW(TAG, "UART ring buffer full");
+                uart_flush_input(SLAVE_UART_NUM);
+                xQueueReset(uart_queue);
+                break;
+            case UART_BREAK:
+                ESP_LOGW(TAG, "UART RX break");
+                break;
+            case UART_PARITY_ERR:
+                ESP_LOGW(TAG, "UART parity error");
+                break;
+            case UART_FRAME_ERR:
+                ESP_LOGW(TAG, "UART frame error");
+                break;
+            default:
+                ESP_LOGW(TAG, "UART event type: %d", event.type);
+                break;
             }
             taskYIELD();
         }
@@ -116,7 +116,7 @@ static void usb_sender_task(void *pvParameters)
     while (1) {
         size_t ringbuf_received;
         uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_sendbuf, &ringbuf_received, pdMS_TO_TICKS(100),
-                CONFIG_USB_CDC_TX_BUFSIZE);
+                       CONFIG_USB_CDC_TX_BUFSIZE);
 
         if (buf) {
             uint8_t int_buf[ringbuf_received];
@@ -226,7 +226,7 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
         gpio_set_level(GPIO_BOOT, boot);
         gpio_set_level(GPIO_RST, rst);
 
-        // On ESP32, TDI jtag signal is on GPIO12, which is also a strapping pin that determines flash voltage. 
+        // On ESP32, TDI jtag signal is on GPIO12, which is also a strapping pin that determines flash voltage.
         // If TDI is high when ESP32 is released from external reset, the flash voltage is set to 1.8V, and the chip will fail to boot.
         // As a solution, MTDI signal forced to be low when RST is about to go high.
         extern bool jtag_tdi_bootstrapping;

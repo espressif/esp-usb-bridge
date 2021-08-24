@@ -1,0 +1,47 @@
+stages:
+  - build
+
+# Global variables
+variables:
+  ESP_IDF_TAG_LATEST: "latest"
+  ESP_IDF_TAG_v43: "v4.3"
+  EUB_APP_NAME: "bridge"
+
+.build_template:
+  stage: build
+  variables:
+    CHIP_NAME: "esp32s2"
+  script:
+    - git submodule update --init --recursive
+    - IDF_TARGET=${CHIP_NAME} idf.py build
+    - cd build
+    - esptool.py --chip ${CHIP_NAME} merge_bin -o ${EUB_APP_NAME}_merged.bin @flash_args
+
+  artifacts:
+    paths:
+      - build/flasher_args.json
+      - build/${EUB_APP_NAME}.elf
+      - build/${EUB_APP_NAME}.bin
+      - build/bootloader/bootloader.bin
+      - build/bootloader/bootloader.elf
+      - build/partition_table/partition-table.bin
+      - build/${EUB_APP_NAME}_merged.bin
+    expire_in: 2 weeks
+
+build_latest:
+  extends: .build_template
+  image: espressif/idf:$ESP_IDF_TAG_LATEST
+
+build_v43:
+  extends: .build_template
+  image: espressif/idf:$ESP_IDF_TAG_v43
+
+pre_commit:
+  stage: build
+  image: espressif/idf:$ESP_IDF_TAG_LATEST
+  except:
+    - master
+  script:
+    - pip install pre-commit
+    - pip install wasmtime
+    - git diff-tree --no-commit-id --name-only -r $CI_MERGE_REQUEST_TARGET_BRANCH_NAME -r $CI_COMMIT_SHA | xargs pre-commit run --files

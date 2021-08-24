@@ -58,7 +58,8 @@
 #define FAT_TABLE_SECTORS               (FAT_CLUSTERS * FAT16_CLUSTER_BYTES / FAT_SECTOR_SIZE)
 #define FAT_BOOT_SECTORS                1
 
-typedef struct __attribute__((__packed__)) {
+typedef struct __attribute__((__packed__))
+{
     uint8_t jump_instructions[3];
     uint8_t oem_name[8];
     uint16_t bytes_per_sector;
@@ -125,22 +126,23 @@ static msc_boot_sector_t msc_disk_boot_sector = {
     // The bootstrap code was generated with mkfs.fat and it prints "This is not a bootable disk. Please insert a
     // bootable floppy and press any key to try again".
     .bootstrap_code = {
-    0x0e, 0x1f, 0xbe, 0x5b, 0x7c, 0xac, 0x22, 0xc0, 0x74, 0x0b, 0x56, 0xb4, 0x0e, 0xbb, 0x07, 0x00, 0xcd, 0x10, 0x5e,
-    0xeb, 0xf0, 0x32, 0xe4, 0xcd, 0x16, 0xcd, 0x19, 0xeb, 0xfe, 0x54, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x6e,
-    0x6f, 0x74, 0x20, 0x61, 0x20, 0x62, 0x6f, 0x6f, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x64, 0x69, 0x73, 0x6b, 0x2e,
-    0x20, 0x20, 0x50, 0x6c, 0x65, 0x61, 0x73, 0x65, 0x20, 0x69, 0x6e, 0x73, 0x65, 0x72, 0x74, 0x20, 0x61, 0x20, 0x62,
-    0x6f, 0x6f, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x66, 0x6c, 0x6f, 0x70, 0x70, 0x79, 0x20, 0x61, 0x6e, 0x64, 0x0d,
-    0x0a, 0x70, 0x72, 0x65, 0x73, 0x73, 0x20, 0x61, 0x6e, 0x79, 0x20, 0x6b, 0x65, 0x79, 0x20, 0x74, 0x6f, 0x20, 0x74,
-    0x72, 0x79, 0x20, 0x61, 0x67, 0x61, 0x69, 0x6e, 0x20, 0x2e, 0x2e, 0x2e, 0x20, 0x0d, 0x0a, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0},
+        0x0e, 0x1f, 0xbe, 0x5b, 0x7c, 0xac, 0x22, 0xc0, 0x74, 0x0b, 0x56, 0xb4, 0x0e, 0xbb, 0x07, 0x00, 0xcd, 0x10, 0x5e,
+        0xeb, 0xf0, 0x32, 0xe4, 0xcd, 0x16, 0xcd, 0x19, 0xeb, 0xfe, 0x54, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x6e,
+        0x6f, 0x74, 0x20, 0x61, 0x20, 0x62, 0x6f, 0x6f, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x64, 0x69, 0x73, 0x6b, 0x2e,
+        0x20, 0x20, 0x50, 0x6c, 0x65, 0x61, 0x73, 0x65, 0x20, 0x69, 0x6e, 0x73, 0x65, 0x72, 0x74, 0x20, 0x61, 0x20, 0x62,
+        0x6f, 0x6f, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x66, 0x6c, 0x6f, 0x70, 0x70, 0x79, 0x20, 0x61, 0x6e, 0x64, 0x0d,
+        0x0a, 0x70, 0x72, 0x65, 0x73, 0x73, 0x20, 0x61, 0x6e, 0x79, 0x20, 0x6b, 0x65, 0x79, 0x20, 0x74, 0x6f, 0x20, 0x74,
+        0x72, 0x79, 0x20, 0x61, 0x67, 0x61, 0x69, 0x6e, 0x20, 0x2e, 0x2e, 0x2e, 0x20, 0x0d, 0x0a, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0
+    },
 
     .end_marker = 0xAA55,
 };
@@ -152,7 +154,7 @@ static uint8_t msc_disk_fat_table_sector0[] = {
 };
 
 static uint8_t msc_disk_readme_sector0[] =
-"Use 'idf.py uf2' to generate an UF2 binary. Drop the generated file into this disk in order to flash the device. \
+    "Use 'idf.py uf2' to generate an UF2 binary. Drop the generated file into this disk in order to flash the device. \
 \r\n";
 
 #define MSC_README_SIZE     (sizeof(msc_disk_readme_sector0) - 1)
@@ -165,7 +167,7 @@ static uint8_t msc_disk_root_directory_sector0[] = {
     0, 0, // starting cluster in the FAT table
     0, 0, 0, 0, // size
     // readme file
-    'R' , 'E' , 'A' , 'D' , 'M' , 'E' , ' ' , ' ' , 'T' , 'X' , 'T' ,
+    'R', 'E', 'A', 'D', 'M', 'E', ' ', ' ', 'T', 'X', 'T',
     0x01, // attribute byte where read-only bit is set
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // time and date for creation & modification
     0x02, 0, // starting cluster in the FAT table
@@ -182,8 +184,8 @@ void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16
 
     ESP_LOGD(TAG, "tud_msc_inquiry_cb() invoked");
 
-    memcpy(vendor_id  , vid, strlen(vid));
-    memcpy(product_id , pid, strlen(pid));
+    memcpy(vendor_id, vid, strlen(vid));
+    memcpy(product_id, pid, strlen(pid));
     memcpy(product_rev, rev, strlen(rev));
 }
 
@@ -216,7 +218,7 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, boo
     (void) power_condition;
 
     ESP_LOGI(TAG, "tud_msc_start_stop_cb() invoked, power_condition=%d, start=%d, load_eject=%d", power_condition,
-        start, load_eject);
+             start, load_eject);
 
     if (load_eject) {
         if (start) {
@@ -308,18 +310,18 @@ static const char *chipid_to_name(uint32_t id)
 {
     // IDs can be found at https://github.com/Microsoft/uf2
     switch (id) {
-        case UF2_ESP8266_ID:
-            return "ESP8266";
-        case 0x1c5f21b0:
-            return "ESP32";
-        case 0xbfdd4eee:
-            return "ESP32-S2";
-        case 0xd42ba06c:
-            return "ESP32-C3";
-        case 0xc47e5767:
-            return "ESP32-S3";
-        default:
-            return "unknown";
+    case UF2_ESP8266_ID:
+        return "ESP8266";
+    case 0x1c5f21b0:
+        return "ESP32";
+    case 0xbfdd4eee:
+        return "ESP32-S2";
+    case 0xd42ba06c:
+        return "ESP32-C3";
+    case 0xc47e5767:
+        return "ESP32-S3";
+    default:
+        return "unknown";
     }
 }
 
@@ -362,11 +364,11 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
             }
 
             ESP_LOGI(TAG, "LBA %d: UF2 block %d of %d for chip %s at %#08x with length %d", lba, p->block_no, p->blocks,
-                chip_name, p->addr, p->payload_size);
+                     chip_name, p->addr, p->payload_size);
 
             if (msc_last_block_written + 1 != p->block_no) {
                 ESP_LOGE(TAG, "Trying to write block no. %d but last time %d was written!", p->block_no,
-                        msc_last_block_written);
+                         msc_last_block_written);
                 return 0;
             }
 
@@ -389,7 +391,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
                 const uint32_t image_size = msc_blocks * msc_chunk_size;
                 if (esp_loader_flash_start(p->addr, image_size, msc_chunk_size) != ESP_LOADER_SUCCESS) {
                     ESP_LOGE(TAG, "Ereasing flash failed at addr %d of length %d with block size %d", p->addr,
-                            image_size, p->payload_size);
+                             image_size, p->payload_size);
                     return 0;
                 }
                 ESP_LOGD(TAG, "ESP LOADER flash start success!");
@@ -398,19 +400,19 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
             if (p->payload_size > msc_chunk_size) {
                 ESP_LOGE(TAG, "UF2 block %d is of size %d and should be at most %d", p->block_no, p->payload_size,
-                        msc_chunk_size);
+                         msc_chunk_size);
                 eub_abort();
             }
 
             if (p->blocks != msc_blocks) {
                 ESP_LOGE(TAG, "UF2 block %d has %d as total block number but it should be %d", p->block_no, p->blocks,
-                        msc_blocks);
+                         msc_blocks);
                 eub_abort();
             }
 
             if (esp_loader_flash_write((void *) p->data, p->payload_size) != ESP_LOADER_SUCCESS) {
                 ESP_LOGE(TAG, "UF2 block %d of %d could not be written at %#08x with length %d", p->block_no, p->blocks,
-                    p->addr, p->payload_size);
+                         p->addr, p->payload_size);
                 eub_abort();
             }
 
@@ -438,20 +440,19 @@ int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, u
     ESP_LOGD(TAG, "tud_msc_scsi_cb() invoked. bufsize=%d", bufsize);
     ESP_LOG_BUFFER_HEXDUMP("scsi_cmd", scsi_cmd, 16, ESP_LOG_DEBUG);
 
-    switch (scsi_cmd[0])
-    {
-        case SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL:
-            ESP_LOGD(TAG, "tud_msc_scsi_cb() invoked: SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL");
-            ret = 0;
-            break;
+    switch (scsi_cmd[0]) {
+    case SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL:
+        ESP_LOGD(TAG, "tud_msc_scsi_cb() invoked: SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL");
+        ret = 0;
+        break;
 
-        default:
-            ESP_LOGW(TAG, "tud_msc_scsi_cb() invoked: %d", scsi_cmd[0]);
+    default:
+        ESP_LOGW(TAG, "tud_msc_scsi_cb() invoked: %d", scsi_cmd[0]);
 
-            tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0x00);
+        tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0x00);
 
-            ret = -1;
-            break;
+        ret = -1;
+        break;
     }
 
     return ret;
@@ -462,7 +463,7 @@ void msc_task(void *pvParameters)
     char volume_label[FAT_VOLUME_NAME_SIZE + 1] = CONFIG_BRIDGE_MSC_VOLUME_LABEL; // +1 because the config value is 0-terminated
     // fill the volume_label with spaces up to length FAT_VOLUME_NAME_SIZE
     memset(volume_label + strlen(CONFIG_BRIDGE_MSC_VOLUME_LABEL), ' ',
-            FAT_VOLUME_NAME_SIZE - strlen(CONFIG_BRIDGE_MSC_VOLUME_LABEL));
+           FAT_VOLUME_NAME_SIZE - strlen(CONFIG_BRIDGE_MSC_VOLUME_LABEL));
     memcpy(msc_disk_boot_sector.volume, volume_label, FAT_VOLUME_NAME_SIZE);
     memcpy(msc_disk_root_directory_sector0, volume_label, FAT_VOLUME_NAME_SIZE);
 
@@ -470,6 +471,6 @@ void msc_task(void *pvParameters)
     ESP_LOG_BUFFER_HEXDUMP("fat", msc_disk_fat_table_sector0, sizeof(msc_disk_fat_table_sector0), ESP_LOG_DEBUG);
     ESP_LOG_BUFFER_HEXDUMP("root", msc_disk_root_directory_sector0, sizeof(msc_disk_root_directory_sector0), ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "MSC disk RAM usage: %d bytes", sizeof(msc_boot_sector_t) + sizeof(msc_disk_fat_table_sector0) +
-            sizeof(msc_disk_root_directory_sector0) + sizeof(msc_disk_readme_sector0));
+             sizeof(msc_disk_root_directory_sector0) + sizeof(msc_disk_readme_sector0));
     vTaskDelete(NULL);
 }

@@ -40,7 +40,7 @@ void __attribute__((noreturn)) eub_abort(void)
         {LED1_ON,  LED2_ON,  LED3_ON},
     };
 
-    for (int i = 0; i < sizeof(led_patterns)/sizeof(led_patterns[0]); ++i) {
+    for (int i = 0; i < sizeof(led_patterns) / sizeof(led_patterns[0]); ++i) {
         gpio_set_level(CONFIG_BRIDGE_GPIO_LED1, led_patterns[i][0]);
         gpio_set_level(CONFIG_BRIDGE_GPIO_LED2, led_patterns[i][1]);
         gpio_set_level(CONFIG_BRIDGE_GPIO_LED3, led_patterns[i][2]);

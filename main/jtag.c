@@ -84,7 +84,7 @@ static void usb_reader_task(void *pvParameters)
             while ((r = tud_vendor_n_read(0, buf, sizeof(buf))) > 0) {
                 if (xRingbufferSend(usb_rcvbuf, buf, r, pdMS_TO_TICKS(1000)) != pdTRUE) {
                     ESP_LOGE(TAG, "Cannot write to usb_rcvbuf ringbuffer (free %d of %d)!",
-                            xRingbufferGetCurFreeSize(usb_rcvbuf), USB_RCVBUF_SIZE);
+                             xRingbufferGetCurFreeSize(usb_rcvbuf), USB_RCVBUF_SIZE);
                     eub_abort();
                 }
             }
@@ -123,7 +123,7 @@ static void usb_send_task(void *pvParameters)
                 const size_t ring_free = xRingbufferGetCurFreeSize(usb_sndbuf);
                 if (ring_free < 0.3 * USB_SNDBUF_SIZE) {
                     ESP_LOGW(TAG, "USB send buffer is full, usb_sndbuf ringbuffer is getting full "
-                            "(has %d free bytes of %d)", ring_free, USB_SNDBUF_SIZE);
+                             "(has %d free bytes of %d)", ring_free, USB_SNDBUF_SIZE);
                 }
                 vTaskDelay(1);
                 continue;
@@ -143,7 +143,7 @@ static int usb_send(const uint8_t *buf, int size)
 {
     if (xRingbufferSend(usb_sndbuf, buf, size, pdMS_TO_TICKS(1000)) != pdTRUE) {
         ESP_LOGE(TAG, "Cannot write to usb_sndbuf ringbuffer (free %d of %d)!",
-                xRingbufferGetCurFreeSize(usb_sndbuf), USB_SNDBUF_SIZE);
+                 xRingbufferGetCurFreeSize(usb_sndbuf), USB_SNDBUF_SIZE);
         return 0;
     }
     return size;
