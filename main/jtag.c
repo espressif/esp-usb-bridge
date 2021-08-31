@@ -37,6 +37,9 @@
 #define ESP_REMOTE_CMD_TMS_SEQ      3
 #define ESP_REMOTE_CMD_SET_CLK      4
 
+#define ESP_REMOTE_CMD_MAX_BITS     12
+#define ESP_REMOTE_CMD_MAX_BYTE     (1 << (ESP_REMOTE_CMD_MAX_BITS - 3))
+
 static const char *TAG = "bridge_jtag";
 
 static uint8_t last_tms = 0;
@@ -46,15 +49,7 @@ static RingbufHandle_t usb_sndbuf;
 
 bool jtag_tdi_bootstrapping = false;
 
-static inline uint8_t *alloc_with_abort(const char *field_name, int size)
-{
-    uint8_t *f = malloc(size * sizeof(uint8_t));
-    if (!f) {
-        ESP_LOGE(TAG, "Cannot allocate %d bytes for %s!", size, field_name);
-        eub_abort();
-    }
-    return f;
-}
+static uint8_t tms_tdo_bytes[ESP_REMOTE_CMD_MAX_BYTE];
 
 static void init_jtag_gpio()
 {
@@ -187,24 +182,18 @@ static void do_jtag(int n_bits, int n_bytes, const uint8_t *tms_bytes, const uin
 
 static void cmd_scan(int n_bits, int n_bytes, bool do_flip_tms, const uint8_t *data_out, uint8_t *data_in)
 {
-    uint8_t *tms_bytes = alloc_with_abort("tms_bytes", n_bytes);
-    memset(tms_bytes, last_tms ? 0xFF : 0, n_bytes);
+    memset(tms_tdo_bytes, last_tms ? 0xFF : 0, n_bytes);
     if (do_flip_tms) {
-        tms_bytes[(n_bits - 1) / 8] ^= (1u << ((n_bits - 1) % 8));
+        tms_tdo_bytes[(n_bits - 1) / 8] ^= (1u << ((n_bits - 1) % 8));
     }
-    do_jtag(n_bits, n_bytes, tms_bytes, data_out, data_in);
-    free(tms_bytes);
+    do_jtag(n_bits, n_bytes, tms_tdo_bytes, data_out, data_in);
 }
 
 static void cmd_tms_seq(int n_bits, int n_bytes, const uint8_t *data_out)
 {
-    uint8_t *tdo_bytes = alloc_with_abort("tdo_bytes", n_bytes);
-    memset(tdo_bytes, 0xFF, n_bytes);
-
-    do_jtag(n_bits, n_bytes, data_out, tdo_bytes, NULL);
+    memset(tms_tdo_bytes, 0xFF, n_bytes);
+    do_jtag(n_bits, n_bytes, data_out, tms_tdo_bytes, NULL);
     last_tms = (data_out[n_bits / 8] & (1u << (n_bits % 8))) != 0;
-
-    free(tdo_bytes);
 }
 
 static void ringbuffer_wait_for_full_string(uint8_t *buf, int size)
@@ -217,7 +206,6 @@ static void ringbuffer_wait_for_full_string(uint8_t *buf, int size)
         i += received;
     }
 }
-
 
 void jtag_task(void *pvParameters)
 {
@@ -268,14 +256,13 @@ void jtag_task(void *pvParameters)
             ESP_LOGD(TAG, "Received CMD_SCAN: n_bits = %d, read = %d, flip_tms = %d", n_bits, read, flip_tms);
             for (int to_read = n_bytes, to_read_bits = n_bits; to_read > 0; to_read -= n, to_read_bits -= (8 * n)) {
                 uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_rcvbuf, &n, portMAX_DELAY, to_read);
+                uint8_t read_out[ESP_REMOTE_CMD_MAX_BYTE];
                 ESP_LOGD(TAG, "[SCAN] Received: %d (need %d)", n, to_read);
                 ESP_LOG_BUFFER_HEXDUMP("SCAN received", buf, n, ESP_LOG_DEBUG);
-                uint8_t *data_out = read ? alloc_with_abort("the readout data", n) : NULL;
-                cmd_scan(MIN(n * 8, to_read_bits), n, n == to_read ? flip_tms : 0, buf, data_out);
+                cmd_scan(MIN(n * 8, to_read_bits), n, n == to_read ? flip_tms : 0, buf, read ? read_out : NULL);
                 vRingbufferReturnItem(usb_rcvbuf, (void *) buf);
-                if (data_out) {
-                    usb_send(data_out, n);
-                    free(data_out);
+                if (read) {
+                    usb_send(read_out, n);
                 }
             }
         } else if (cmd == ESP_REMOTE_CMD_TMS_SEQ) {
@@ -292,7 +279,7 @@ void jtag_task(void *pvParameters)
         } else if (cmd == ESP_REMOTE_CMD_RESET) {
             const uint8_t srst = func_specific & 1;
             const uint8_t trst = (func_specific >> 1) & 1;
-            ESP_LOGD(TAG, "Received CMD_RESET: srst = %d, trst = %d", srst, trst);
+            ESP_LOGI(TAG, "Received CMD_RESET: srst = %d, trst = %d", srst, trst);
 
             const uint8_t buf[] = {0xff}; // 8 TMS=1 is more than enough to return the TAP state to RESET
             cmd_tms_seq(sizeof(buf) * 8, sizeof(buf), buf);
