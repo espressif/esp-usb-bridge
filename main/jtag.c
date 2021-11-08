@@ -20,11 +20,7 @@
 #include "sdkconfig.h"
 #include "driver/gpio.h"
 #include "util.h"
-
-#define GPIO_TDI                    CONFIG_BRIDGE_GPIO_TDI
-#define GPIO_TDO                    CONFIG_BRIDGE_GPIO_TDO
-#define GPIO_TCK                    CONFIG_BRIDGE_GPIO_TCK
-#define GPIO_TMS                    CONFIG_BRIDGE_GPIO_TMS
+#include "io.h"
 
 #define USB_RCVBUF_SIZE             4096
 #define USB_SNDBUF_SIZE             32*1024
@@ -235,6 +231,9 @@ void jtag_task(void *pvParameters)
             case CMD_SRST0:
             case CMD_SRST1:
                 cmd_rpt_cnt = 8; //8 TMS=1 is more than enough to return the TAP state to RESET
+                // gpio_set_level(GPIO_RST, 0);
+                // ets_delay_us(100);
+                // gpio_set_level(GPIO_RST, 1);
                 break;
             default:
                 rep_cnt = 0;
@@ -245,7 +244,7 @@ void jtag_task(void *pvParameters)
                 if (cmd_exec < CMD_FLUSH) {
                     do_jtag_one(pin_levels[cmd_exec].tdo_req, pin_levels[cmd_exec].tms, pin_levels[cmd_exec].tdi);
                 } else if (cmd_exec == CMD_FLUSH ) {
-                    s_total_tdo_bits = (s_total_tdo_bits + 7) & (~7); //roundup
+                    s_total_tdo_bits = (s_total_tdo_bits + 7) & (~7); // roundup
                     if (s_usb_sent_bits < s_total_tdo_bits) {
                         int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
                         while (waiting_to_send_bits > 0) {
@@ -261,10 +260,13 @@ void jtag_task(void *pvParameters)
                 }
             }
 
+            /* As soon as either 64 bytes (512 bits) have been collected or a CMD_FLUSH command is executed,
+                make the usb buffer available for the host to receive.
+            */
             int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
             if (waiting_to_send_bits >= 512) {
                 int send_bits = waiting_to_send_bits > 512 ? 512 : waiting_to_send_bits;
-                int n = (send_bits + 7) / 8;  //roundup
+                int n = (send_bits + 7) / 8;  // roundup
                 usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), n);
                 memset(s_tdo_bytes + (s_usb_sent_bits / 8), 0x00, n);
                 s_usb_sent_bits += n * 8;

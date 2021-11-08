@@ -26,11 +26,7 @@
 #include "esp_timer.h"
 #include "util.h"
 #include "serial.h"
-
-#define GPIO_BOOT    CONFIG_BRIDGE_GPIO_BOOT
-#define GPIO_RST     CONFIG_BRIDGE_GPIO_RST
-#define GPIO_RXD     CONFIG_BRIDGE_GPIO_RXD
-#define GPIO_TXD     CONFIG_BRIDGE_GPIO_TXD
+#include "io.h"
 
 #define SLAVE_UART_NUM          UART_NUM_1
 #define SLAVE_UART_BUF_SIZE     (2 * 1024)

@@ -78,6 +78,7 @@ static uint8_t const desc_configuration[] = {
 
     // Interface number, string index, EP Out & EP In address, EP size
     TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, 6, EPNUM_MSC, 0x80 | EPNUM_MSC, 64),
+
 };
 
 #define MAC_BYTES       6
