@@ -228,12 +228,13 @@ void jtag_task(void *pvParameters)
                 cmd_rpt_cnt = (cmd - CMD_REP0) << (2 * rep_cnt++);
                 cmd_exec = prev_cmd;
                 break;
-            case CMD_SRST0:
-            case CMD_SRST1:
-                cmd_rpt_cnt = 8; //8 TMS=1 is more than enough to return the TAP state to RESET
-                // gpio_set_level(GPIO_RST, 0);
-                // ets_delay_us(100);
-                // gpio_set_level(GPIO_RST, 1);
+            case CMD_SRST0:         // JTAG Tap reset command is not expected from host but still we are ready
+                cmd_rpt_cnt = 8;    // 8 TMS=1 is more than enough to return the TAP state to RESET
+                break;
+            case CMD_SRST1:         // system reset
+                gpio_set_level(GPIO_RST, 0);
+                ets_delay_us(100);
+                gpio_set_level(GPIO_RST, 1);
                 break;
             default:
                 rep_cnt = 0;
@@ -241,7 +242,7 @@ void jtag_task(void *pvParameters)
             }
 
             for (int i = 0; i < cmd_rpt_cnt; i++) {
-                if (cmd_exec < CMD_FLUSH) {
+                if (cmd_exec < CMD_SRST1) {
                     do_jtag_one(pin_levels[cmd_exec].tdo_req, pin_levels[cmd_exec].tms, pin_levels[cmd_exec].tdi);
                 } else if (cmd_exec == CMD_FLUSH ) {
                     s_total_tdo_bits = (s_total_tdo_bits + 7) & (~7); // roundup
