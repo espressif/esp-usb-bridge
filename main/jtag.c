@@ -25,16 +25,6 @@
 #define USB_RCVBUF_SIZE             4096
 #define USB_SNDBUF_SIZE             32*1024
 
-#define ESP_REMOTE_HEADER_LEN       4
-#define ESP_REMOTE_CMD_VER_1        1
-#define ESP_REMOTE_CMD_RESET        1
-#define ESP_REMOTE_CMD_SCAN         2
-#define ESP_REMOTE_CMD_TMS_SEQ      3
-#define ESP_REMOTE_CMD_SET_CLK      4
-
-#define ESP_REMOTE_CMD_MAX_BITS     12
-#define ESP_REMOTE_CMD_MAX_BYTE     (1 << (ESP_REMOTE_CMD_MAX_BITS - 3))
-
 static const char *TAG = "bridge_jtag";
 
 static RingbufHandle_t usb_rcvbuf;
@@ -45,6 +35,47 @@ bool jtag_tdi_bootstrapping = false;  //TODO check in do_jtag_one
 static uint8_t s_tdo_bytes[1024];
 static uint16_t s_total_tdo_bits = 0;
 static uint16_t s_usb_sent_bits = 0;
+
+jtag_proto_caps_t jtag_proto_caps = {
+    {.proto_ver = JTAG_PROTO_CAPS_VER, .length = sizeof(jtag_proto_caps_hdr_t) + sizeof(jtag_proto_caps_speed_apb_t)},
+    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = 0x1f40, .div_min = 0x0001, .div_max = 0x00FF}
+};
+
+bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const *request)
+{
+    // nothing to with DATA & ACK stage
+    if (stage != CONTROL_STAGE_SETUP) {
+        return true;
+    }
+
+    switch (request->bmRequestType_bit.type) {
+    case TUSB_REQ_TYPE_VENDOR:
+        ESP_LOGI(TAG, "bRequest: (%d) wValue: (%d) wIndex: (%d)",
+                 request->bRequest, request->wValue, request->wIndex);
+
+        switch (request->bRequest) {
+        case VEND_JTAG_SETDIV:
+            ESP_LOGD(TAG, "VEND_JTAG_SETDIV");
+            // TODO: process the command
+            // response with status OK
+            return tud_control_status(rhport, request);
+        case VEND_JTAG_SETIO:
+            ESP_LOGD(TAG, "VEND_JTAG_SETIO");
+            // TODO: process the command
+            // response with status OK
+            return tud_control_status(rhport, request);
+        case VEND_JTAG_GETTDO:
+            ESP_LOGD(TAG, "VEND_JTAG_GETTDO");
+            {
+                uint8_t buf = gpio_get_level(GPIO_TDI);
+                return tud_control_xfer(rhport, request, (void *)&buf, 1);
+            }
+        }
+        break;
+    }
+
+    return false;
+}
 
 static void init_jtag_gpio()
 {

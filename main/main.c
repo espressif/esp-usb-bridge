@@ -140,9 +140,14 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 {
     uint8_t chr_count;
 
+    ESP_LOGI(TAG, "tud_descriptor_string_cb index : %d", index);
+
     if (index == 0) {
         memcpy(&_desc_str[1], string_desc_arr[0], 2);
         chr_count = 1;
+    } else if (index == 10) { //jtag
+        memcpy(&_desc_str[1], (uint16_t *)&jtag_proto_caps, sizeof(jtag_proto_caps));
+        chr_count = sizeof(jtag_proto_caps) / 2;
     } else {
         // Convert ASCII string into UTF-16
 
@@ -165,6 +170,8 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 
     // first byte is length (including header), second byte is string type
     _desc_str[0] = (TUSB_DESC_STRING << 8 ) | (2 * chr_count + 2);
+
+
 
     return _desc_str;
 }
