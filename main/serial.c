@@ -14,7 +14,7 @@
 
 #include <stdlib.h>
 #include "esp_log.h"
-#include "esp_chip_info.h"
+#include "esp_idf_version.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/ringbuf.h"

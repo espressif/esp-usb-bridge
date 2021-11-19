@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "esp_log.h"
-#include "esp_chip_info.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/ringbuf.h"
@@ -63,9 +62,10 @@ typedef struct {
 #define VEND_JTAG_GETTDO        2
 #define VEND_JTAG_SET_CHIPID    3
 
+// TCK frequency is around 750KHZ and we do not support selective clock for now.
 jtag_proto_caps_t jtag_proto_caps = {
     {.proto_ver = JTAG_PROTO_CAPS_VER, .length = sizeof(jtag_proto_caps_hdr_t) + sizeof(jtag_proto_caps_speed_apb_t)},
-    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = 0x1f40, .div_min = 0x0001, .div_max = 0x0001}
+    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = 0x96, .div_min = 0x0001, .div_max = 0x0001}
 };
 
 static RingbufHandle_t usb_rcvbuf;

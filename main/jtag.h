@@ -16,6 +16,12 @@
 
 #include <stdint.h>
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
+#include "esp_chip_info.h"
+#else
+#include "esp_system.h"
+#endif
+
 /* Be carefull if you want to change the index. It must be bigger then the size of string_desc_arr
    For now 7 would be also ok. But lets reserve some fields fot the future additions
    Also it must be match with the value in the openocd/esp_usb_bridge.cfg file
