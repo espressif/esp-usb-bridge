@@ -14,6 +14,7 @@
 
 #include <stdlib.h>
 #include "esp_log.h"
+#include "esp_chip_info.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/ringbuf.h"
@@ -27,6 +28,7 @@
 #include "util.h"
 #include "serial.h"
 #include "io.h"
+#include "jtag.h"
 
 #define SLAVE_UART_NUM          UART_NUM_1
 #define SLAVE_UART_BUF_SIZE     (2 * 1024)
@@ -240,14 +242,18 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
         // On ESP32, TDI jtag signal is on GPIO12, which is also a strapping pin that determines flash voltage.
         // If TDI is high when ESP32 is released from external reset, the flash voltage is set to 1.8V, and the chip will fail to boot.
         // As a solution, MTDI signal forced to be low when RST is about to go high.
-        extern bool jtag_tdi_bootstrapping;
-        if (!jtag_tdi_bootstrapping && boot && !rst) {
-            jtag_tdi_bootstrapping = true;
+        static bool tdi_bootstrapping = false;
+        if (jtag_get_target_model() == CHIP_ESP32 && !tdi_bootstrapping && boot && !rst) {
+            jtag_task_suspend();
+            tdi_bootstrapping = true;
             gpio_set_level(CONFIG_BRIDGE_GPIO_TDO, 0);
+            ESP_LOGW(TAG, "jtag task suspended");
         }
-        if (jtag_tdi_bootstrapping && boot && rst) {
+        if (tdi_bootstrapping && boot && rst) {
             ets_delay_us(1000); /* wait for reset */
-            jtag_tdi_bootstrapping = false;
+            jtag_task_resume();
+            tdi_bootstrapping = false;
+            ESP_LOGW(TAG, "jtag task resumed");
         }
     }
 }

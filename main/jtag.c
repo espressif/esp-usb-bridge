@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "esp_log.h"
+#include "esp_chip_info.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/ringbuf.h"
@@ -27,19 +28,54 @@
 
 static const char *TAG = "bridge_jtag";
 
+/* esp usb serial protocol specific definitions */
+#define JTAG_PROTO_CAPS_VER 1   /*Version field. */
+typedef struct __attribute__((packed))
+{
+    uint8_t proto_ver;  /*Protocol version. Expects JTAG_PROTO_CAPS_VER for now. */
+    uint8_t length; /*of this plus any following descriptors */
+} jtag_proto_caps_hdr_t;
+
+#define JTAG_PROTO_CAPS_SPEED_APB_TYPE 1
+typedef struct __attribute__((packed))
+{
+    uint8_t type;
+    uint8_t length;
+} jtag_gen_hdr_t;
+
+typedef struct __attribute__((packed))
+{
+    uint8_t type;   /*Type, always JTAG_PROTO_CAPS_SPEED_APB_TYPE */
+    uint8_t length; /*Length of this */
+    uint16_t apb_speed_10khz;   /*ABP bus speed, in 10KHz increments. Base speed is half
+                     * this. */
+    uint16_t div_min;   /*minimum divisor (to base speed), inclusive */
+    uint16_t div_max;   /*maximum divisor (to base speed), inclusive */
+} jtag_proto_caps_speed_apb_t;
+
+typedef struct {
+    jtag_proto_caps_hdr_t proto_hdr;
+    jtag_proto_caps_speed_apb_t caps_apb;
+} jtag_proto_caps_t;
+
+#define VEND_JTAG_SETDIV        0
+#define VEND_JTAG_SETIO         1
+#define VEND_JTAG_GETTDO        2
+#define VEND_JTAG_SET_CHIPID    3
+
+jtag_proto_caps_t jtag_proto_caps = {
+    {.proto_ver = JTAG_PROTO_CAPS_VER, .length = sizeof(jtag_proto_caps_hdr_t) + sizeof(jtag_proto_caps_speed_apb_t)},
+    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = 0x1f40, .div_min = 0x0001, .div_max = 0x0001}
+};
+
 static RingbufHandle_t usb_rcvbuf;
 static RingbufHandle_t usb_sndbuf;
-
-bool jtag_tdi_bootstrapping = false;  //TODO check in do_jtag_one
 
 static uint8_t s_tdo_bytes[1024];
 static uint16_t s_total_tdo_bits = 0;
 static uint16_t s_usb_sent_bits = 0;
-
-jtag_proto_caps_t jtag_proto_caps = {
-    {.proto_ver = JTAG_PROTO_CAPS_VER, .length = sizeof(jtag_proto_caps_hdr_t) + sizeof(jtag_proto_caps_speed_apb_t)},
-    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = 0x1f40, .div_min = 0x0001, .div_max = 0x00FF}
-};
+static esp_chip_model_t s_target_model;
+static TaskHandle_t s_task_handle = NULL;
 
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const *request)
 {
@@ -55,23 +91,20 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 
         switch (request->bRequest) {
         case VEND_JTAG_SETDIV:
-            ESP_LOGD(TAG, "VEND_JTAG_SETDIV");
-            // TODO: process the command
-            // response with status OK
-            return tud_control_status(rhport, request);
         case VEND_JTAG_SETIO:
-            ESP_LOGD(TAG, "VEND_JTAG_SETIO");
-            // TODO: process the command
-            // response with status OK
-            return tud_control_status(rhport, request);
-        case VEND_JTAG_GETTDO:
-            ESP_LOGD(TAG, "VEND_JTAG_GETTDO");
-            {
-                uint8_t buf = gpio_get_level(GPIO_TDI);
-                return tud_control_xfer(rhport, request, (void *)&buf, 1);
-            }
+            // TODO: process the commands
+            break;
+        case VEND_JTAG_GETTDO: {
+            uint8_t buf = gpio_get_level(GPIO_TDI);
+            return tud_control_xfer(rhport, request, (void *)&buf, 1);
         }
         break;
+        case VEND_JTAG_SET_CHIPID:
+            s_target_model = request->wValue;
+        }
+
+        // response with status OK
+        return tud_control_status(rhport, request);
     }
 
     return false;
@@ -186,8 +219,34 @@ static void do_jtag_one(uint8_t tdo_req, uint8_t tms, uint8_t tdi)
     gpio_set_level(GPIO_TCK, 0);
 }
 
+int jtag_get_proto_caps(uint16_t *dest)
+{
+    memcpy(dest, (uint16_t *)&jtag_proto_caps, sizeof(jtag_proto_caps));
+    return sizeof(jtag_proto_caps);
+}
+
+int jtag_get_target_model(void)
+{
+    return s_target_model;
+}
+
+void jtag_task_suspend(void)
+{
+    if (s_task_handle) {
+        vTaskSuspend(s_task_handle);
+    }
+}
+
+void jtag_task_resume(void)
+{
+    if (s_task_handle) {
+        vTaskResume(s_task_handle);
+    }
+}
+
 void jtag_task(void *pvParameters)
 {
+    s_task_handle = xTaskGetCurrentTaskHandle();
     init_jtag_gpio();
 
     usb_rcvbuf = xRingbufferCreate(USB_RCVBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
@@ -262,10 +321,11 @@ void jtag_task(void *pvParameters)
             case CMD_SRST0:         // JTAG Tap reset command is not expected from host but still we are ready
                 cmd_rpt_cnt = 8;    // 8 TMS=1 is more than enough to return the TAP state to RESET
                 break;
-            case CMD_SRST1:         // system reset
-                gpio_set_level(GPIO_RST, 0);
-                ets_delay_us(100);
-                gpio_set_level(GPIO_RST, 1);
+            case CMD_SRST1:         // FIXME: system reset may cause an issue during openocd examination
+                cmd_rpt_cnt = 8;    // for now this is also used for the tap reset
+                // gpio_set_level(GPIO_RST, 0);
+                // ets_delay_us(100);
+                // gpio_set_level(GPIO_RST, 1);
                 break;
             default:
                 rep_cnt = 0;

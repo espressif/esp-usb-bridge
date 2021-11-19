@@ -66,11 +66,10 @@ static tusb_desc_device_t descriptor_config = {
     .bNumConfigurations = 0x01
 };
 
-
 /*
     ESP usb builtin jtag subclass and protocol is 0xFF and 0x01 respectively.
     However, Tinyusb default values are 0x00.
-    In order to use same protocol without openocd and tinyusb customization we are re-defining
+    In order to use same protocol without tinyusb customization we are re-defining
     vendor descriptor here.
 */
 // Interface number, string index, EP Out & IN address, EP size
@@ -108,6 +107,8 @@ static char const *string_desc_arr[] = {
     "CDC",
     "JTAG",
     "MSC",
+
+    /* JTAG_STR_DESC_INX 0x0A */
 };
 
 static uint16_t _desc_str[32];
@@ -140,14 +141,11 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 {
     uint8_t chr_count;
 
-    ESP_LOGI(TAG, "tud_descriptor_string_cb index : %d", index);
-
     if (index == 0) {
         memcpy(&_desc_str[1], string_desc_arr[0], 2);
         chr_count = 1;
-    } else if (index == 10) { //jtag
-        memcpy(&_desc_str[1], (uint16_t *)&jtag_proto_caps, sizeof(jtag_proto_caps));
-        chr_count = sizeof(jtag_proto_caps) / 2;
+    } else if (index == JTAG_STR_DESC_INX) {
+        chr_count = jtag_get_proto_caps(&_desc_str[1]) / 2;
     } else {
         // Convert ASCII string into UTF-16
 
@@ -170,8 +168,6 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 
     // first byte is length (including header), second byte is string type
     _desc_str[0] = (TUSB_DESC_STRING << 8 ) | (2 * chr_count + 2);
-
-
 
     return _desc_str;
 }
