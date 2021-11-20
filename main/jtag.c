@@ -23,11 +23,12 @@
 #include "io.h"
 
 #define USB_RCVBUF_SIZE             4096
-#define USB_SNDBUF_SIZE             32*1024
+#define USB_SNDBUF_SIZE             (32*1024)
 
 static const char *TAG = "bridge_jtag";
 
 /* esp usb serial protocol specific definitions */
+#define JTAG_PROTO_MAX_BITS      (CFG_TUD_VENDOR_RX_BUFSIZE * 8)
 #define JTAG_PROTO_CAPS_VER 1   /*Version field. */
 typedef struct __attribute__((packed))
 {
@@ -63,9 +64,10 @@ typedef struct {
 #define VEND_JTAG_SET_CHIPID    3
 
 // TCK frequency is around 750KHZ and we do not support selective clock for now.
+#define TCK_FREQ(khz) ((khz * 2) / 10)
 jtag_proto_caps_t jtag_proto_caps = {
     {.proto_ver = JTAG_PROTO_CAPS_VER, .length = sizeof(jtag_proto_caps_hdr_t) + sizeof(jtag_proto_caps_speed_apb_t)},
-    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = 0x96, .div_min = 0x0001, .div_max = 0x0001}
+    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = TCK_FREQ(750), .div_min = 1, .div_max = 1}
 };
 
 static RingbufHandle_t usb_rcvbuf;
@@ -299,9 +301,11 @@ void jtag_task(void *pvParameters)
     int prev_cmd = CMD_SRST0, rep_cnt = 0;
 
     while (1) {
+        gpio_set_level(LED_JTAG, LED_JTAG_OFF);
         char *nibbles = (char *)xRingbufferReceive(usb_rcvbuf,
                         &cnt,
                         portMAX_DELAY);
+        gpio_set_level(LED_JTAG, LED_JTAG_ON);
 
         ESP_LOG_BUFFER_HEXDUMP(TAG, nibbles, cnt, ESP_LOG_DEBUG);
 
@@ -333,14 +337,14 @@ void jtag_task(void *pvParameters)
             }
 
             for (int i = 0; i < cmd_rpt_cnt; i++) {
-                if (cmd_exec < CMD_SRST1) {
+                if (cmd_exec < CMD_FLUSH) {
                     do_jtag_one(pin_levels[cmd_exec].tdo_req, pin_levels[cmd_exec].tms, pin_levels[cmd_exec].tdi);
                 } else if (cmd_exec == CMD_FLUSH ) {
                     s_total_tdo_bits = (s_total_tdo_bits + 7) & (~7); // roundup
                     if (s_usb_sent_bits < s_total_tdo_bits) {
                         int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
                         while (waiting_to_send_bits > 0) {
-                            int send_bits = waiting_to_send_bits > 512 ? 512 : waiting_to_send_bits;
+                            int send_bits = waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits;
                             usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), send_bits / 8);
                             s_usb_sent_bits += send_bits;
                             waiting_to_send_bits -= send_bits;
@@ -356,8 +360,8 @@ void jtag_task(void *pvParameters)
                 make the usb buffer available for the host to receive.
             */
             int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
-            if (waiting_to_send_bits >= 512) {
-                int send_bits = waiting_to_send_bits > 512 ? 512 : waiting_to_send_bits;
+            if (waiting_to_send_bits >= JTAG_PROTO_MAX_BITS) {
+                int send_bits = waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits;
                 int n = (send_bits + 7) / 8;  // roundup
                 usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), n);
                 memset(s_tdo_bytes + (s_usb_sent_bits / 8), 0x00, n);

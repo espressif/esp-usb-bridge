@@ -18,32 +18,24 @@
 #include "driver/gpio.h"
 #include "util.h"
 #include "sdkconfig.h"
-
-#define LED1_ON       CONFIG_BRIDGE_GPIO_LED1_ACTIVE
-#define LED1_OFF    (!CONFIG_BRIDGE_GPIO_LED1_ACTIVE)
-
-#define LED2_ON       CONFIG_BRIDGE_GPIO_LED2_ACTIVE
-#define LED2_OFF    (!CONFIG_BRIDGE_GPIO_LED2_ACTIVE)
-
-#define LED3_ON       CONFIG_BRIDGE_GPIO_LED3_ACTIVE
-#define LED3_OFF    (!CONFIG_BRIDGE_GPIO_LED3_ACTIVE)
+#include "io.h"
 
 void __attribute__((noreturn)) eub_abort(void)
 {
     const int led_patterns[][3] = {
-        {LED1_ON,  LED2_ON,  LED3_ON},
-        {LED1_ON,  LED2_OFF, LED3_ON},
-        {LED1_OFF, LED2_ON,  LED3_OFF},
-        {LED1_ON,  LED2_OFF, LED3_ON},
-        {LED1_OFF, LED2_ON,  LED3_OFF},
-        {LED1_ON,  LED2_OFF, LED3_ON},
-        {LED1_ON,  LED2_ON,  LED3_ON},
+        {LED_TX_ON,  LED_RX_ON,  LED_JTAG_ON},
+        {LED_TX_ON,  LED_RX_OFF, LED_JTAG_ON},
+        {LED_TX_OFF, LED_RX_ON,  LED_JTAG_OFF},
+        {LED_TX_ON,  LED_RX_OFF, LED_JTAG_ON},
+        {LED_TX_OFF, LED_RX_ON,  LED_JTAG_OFF},
+        {LED_TX_ON,  LED_RX_OFF, LED_JTAG_ON},
+        {LED_TX_ON,  LED_RX_ON,  LED_JTAG_ON},
     };
 
     for (int i = 0; i < sizeof(led_patterns) / sizeof(led_patterns[0]); ++i) {
-        gpio_set_level(CONFIG_BRIDGE_GPIO_LED1, led_patterns[i][0]);
-        gpio_set_level(CONFIG_BRIDGE_GPIO_LED2, led_patterns[i][1]);
-        gpio_set_level(CONFIG_BRIDGE_GPIO_LED3, led_patterns[i][2]);
+        gpio_set_level(LED_TX, led_patterns[i][0]);
+        gpio_set_level(LED_RX, led_patterns[i][1]);
+        gpio_set_level(LED_JTAG, led_patterns[i][2]);
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 
