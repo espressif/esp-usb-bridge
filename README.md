@@ -65,41 +65,32 @@ serial port as well.
 
 ## JTAG Bridge
 
-
 The ESP USB Bridge provides a JTAG device. The following command can be used to connect to an ESP32 target MCU.
 ```bash
-idf.py openocd --openocd-commands "-f interface/jtag_esp_remote.cfg -f target/esp32.cfg"
+idf.py openocd --openocd-commands "-f board/esp32-bridge.cfg"
 ```
 
-[Openocd-esp32](https://github.com/espressif/openocd-esp32) version v0.10.0-esp32-20201125 or newer can be used as
+[Openocd-esp32](https://github.com/espressif/openocd-esp32) version v0.11.0-esp32-20211220 or newer can be used as
 well to achieve the same:
 ```bash
-openocd -f interface/jtag_esp_remote.cfg -f target/esp32.cfg
+openocd -f board/esp32-bridge.cfg
 ```
 
-Please note that the ESP remote protocol has to be selected to communicate with the target MCU. `idf.py openocd`
+Please note that the ESP usb bridge protocol has to be selected to communicate with the target MCU. `idf.py openocd`
 without additional arguments would establish connection with the ESP32-S2 (if the JTAG pins are connected through a
 USB-to-JTAG bridge to the PC).
 
-You might want to make your own copy of `jtag_esp_remote.cfg` with the appropriate product and vendor identificators
+You might want to make your own copy of `esp_usb_bridge.cfg` with the appropriate product and vendor identificators
 of your custom hardware:
 ```
-interface jtag_esp_remote
-jtag_esp_remote_protocol usb
-jtag_esp_remote_vid_pid 0x303a 0x1002
+adapter driver esp_usb_jtag
+espusbjtag vid_pid 0x303a 0x1002
+espusbjtag caps_descriptor 0x030A  # string descriptor index:10
 ```
 
 The JTAG interface might need some additional setup to work. Please consult the
 [documentation of ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/jtag-debugging/configure-ft2232h-jtag.html)
 for achieving this.
-
-### Known issues
-
-- The watchdogs need to be disabled or the target MCU could be restarted during the halt operation. Watchdogs can be
-  disabled by disabling `CONFIG_ESP_INT_WDT` and `CONFIG_ESP_TASK_WDT` sdkconfig values of the target project (not ESP
-  USB Bridge).
-- The JTAG communication is currently very slow. `set remotetimeout 100` should be set before loading the project
-  binary. The command can be placed into the gdbinit file as the first instruction.
 
 ## Mass Storage Device
 
