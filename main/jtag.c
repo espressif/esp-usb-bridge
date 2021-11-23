@@ -25,6 +25,8 @@
 #define USB_RCVBUF_SIZE             4096
 #define USB_SNDBUF_SIZE             (32*1024)
 
+#define ROUND_UP_BITS(x)            ((x + 7) & (~7))
+
 static const char *TAG = "bridge_jtag";
 
 /* esp usb serial protocol specific definitions */
@@ -65,7 +67,7 @@ typedef struct {
 
 // TCK frequency is around 750KHZ and we do not support selective clock for now.
 #define TCK_FREQ(khz) ((khz * 2) / 10)
-jtag_proto_caps_t jtag_proto_caps = {
+static const jtag_proto_caps_t jtag_proto_caps = {
     {.proto_ver = JTAG_PROTO_CAPS_VER, .length = sizeof(jtag_proto_caps_hdr_t) + sizeof(jtag_proto_caps_speed_apb_t)},
     {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = TCK_FREQ(750), .div_min = 1, .div_max = 1}
 };
@@ -340,7 +342,7 @@ void jtag_task(void *pvParameters)
                 if (cmd_exec < CMD_FLUSH) {
                     do_jtag_one(pin_levels[cmd_exec].tdo_req, pin_levels[cmd_exec].tms, pin_levels[cmd_exec].tdi);
                 } else if (cmd_exec == CMD_FLUSH ) {
-                    s_total_tdo_bits = (s_total_tdo_bits + 7) & (~7); // roundup
+                    s_total_tdo_bits = ROUND_UP_BITS(s_total_tdo_bits);
                     if (s_usb_sent_bits < s_total_tdo_bits) {
                         int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
                         while (waiting_to_send_bits > 0) {
@@ -361,12 +363,12 @@ void jtag_task(void *pvParameters)
             */
             int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
             if (waiting_to_send_bits >= JTAG_PROTO_MAX_BITS) {
-                int send_bits = waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits;
-                int n = (send_bits + 7) / 8;  // roundup
-                usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), n);
-                memset(s_tdo_bytes + (s_usb_sent_bits / 8), 0x00, n);
-                s_usb_sent_bits += n * 8;
-                waiting_to_send_bits -= n * 8;
+                int send_bits = ROUND_UP_BITS(waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits);
+                int n_byte = send_bits / 8;
+                usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), n_byte);
+                memset(s_tdo_bytes + (s_usb_sent_bits / 8), 0x00, n_byte);
+                s_usb_sent_bits += send_bits;
+                waiting_to_send_bits -= send_bits;
                 if (waiting_to_send_bits <= 0) {
                     s_total_tdo_bits = s_usb_sent_bits = 0;
                 }
