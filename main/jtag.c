@@ -116,12 +116,12 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 
 static void init_jtag_gpio()
 {
-    gpio_config_t io_conf = {};
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL << GPIO_TDO) | (1ULL << GPIO_TCK) | (1ULL << GPIO_TMS);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
+    gpio_config_t io_conf = {
+        .mode = GPIO_MODE_OUTPUT,
+        .pin_bit_mask = (1ULL << GPIO_TDO) | (1ULL << GPIO_TCK) | (1ULL << GPIO_TMS),
+        .pull_down_en = 0,
+        .pull_up_en = 0,
+    };
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
     io_conf.mode = GPIO_MODE_INPUT;

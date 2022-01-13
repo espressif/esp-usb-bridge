@@ -24,10 +24,20 @@
 #include "hal/usb_hal.h"
 #include "soc/usb_periph.h"
 #include "esp32s2/rom/gpio.h"
-#include "driver/periph_ctrl.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
+#include "esp_idf_version.h"
 #include "esp_system.h"
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
+#include "esp_mac.h"
+#endif
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include "esp_private/periph_ctrl.h"
+#else
+#include "driver/periph_ctrl.h"
+#endif
 
 static const char *TAG = "bridge_main";
 

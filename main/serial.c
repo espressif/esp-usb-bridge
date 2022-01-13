@@ -25,6 +25,7 @@
 #include "esp_loader.h"
 #include "esp32_port.h"
 #include "esp_timer.h"
+#include "esp_rom_sys.h"
 #include "util.h"
 #include "serial.h"
 #include "io.h"
@@ -254,7 +255,7 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
             ESP_LOGW(TAG, "jtag task suspended");
         }
         if (tdi_bootstrapping && boot && rst) {
-            ets_delay_us(1000); /* wait for reset */
+            esp_rom_delay_us(1000); /* wait for reset */
             jtag_task_resume();
             tdi_bootstrapping = false;
             ESP_LOGW(TAG, "jtag task resumed");
