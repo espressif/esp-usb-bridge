@@ -5,7 +5,7 @@ stages:
 variables:
   ESP_IDF_TAG_LATEST: "latest"
   ESP_IDF_TAG_v44: "release-v4.4"
-  ESP_IDF_TAG_v43: "v4.3"
+  ESP_IDF_TAG_v43: "release-v4.3"
   EUB_APP_NAME: "bridge"
 
 .build_template:
