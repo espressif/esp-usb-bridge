@@ -6,7 +6,7 @@ bridge between a computer (PC) and a target microcontroller (MCU). It can serve 
 
 The concept of ESP USB Bridge is shown in the following figure.
 
-<img src="images/board.png" height="400" alt="board">
+<img src="images/concept.png" height="400" alt="ESP USB Bridge concept">
 
 ESP32-S2 creates a composite USB device accessible from the PC when they are connected through an USB cable. The main
 features are the following.
