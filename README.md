@@ -78,6 +78,11 @@ cd AN_ESP32_PROJECT
 idf.py uf2
 ```
 
+### Known issues
+
+- The JTAG communication is currently slow. `set remotetimeout 100` should be set before loading the project
+  binary. The command can be placed into the gdbinit file as the first instruction.
+
 ## License
 
 The code in this project Copyright 2020-2022 Espressif Systems (Shanghai) Co Ltd., and is licensed under the Apache License Version 2.0. The copy of the license can be found in the [LICENSE](LICENSE) file.
