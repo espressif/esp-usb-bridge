@@ -21,6 +21,8 @@
 #include "driver/gpio.h"
 #include "util.h"
 #include "io.h"
+#include "hal/gpio_ll.h"
+#include "hal/gpio_hal.h"
 
 #define USB_RCVBUF_SIZE             4096
 #define USB_SNDBUF_SIZE             (32*1024)
@@ -80,6 +82,7 @@ static uint16_t s_total_tdo_bits = 0;
 static uint16_t s_usb_sent_bits = 0;
 static esp_chip_model_t s_target_model;
 static TaskHandle_t s_task_handle = NULL;
+static gpio_dev_t *const s_gpio_dev = GPIO_HAL_GET_HW(GPIO_PORT_0);
 
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const *request)
 {
@@ -210,17 +213,17 @@ static int usb_send(const uint8_t *buf, int size)
 
 static void do_jtag_one(uint8_t tdo_req, uint8_t tms, uint8_t tdi)
 {
-    gpio_set_level(GPIO_TDO, tdi);
-    gpio_set_level(GPIO_TMS, tms);
+    gpio_ll_set_level(s_gpio_dev, GPIO_TDO, tdi);
+    gpio_ll_set_level(s_gpio_dev, GPIO_TMS, tms);
 
-    gpio_set_level(GPIO_TCK, 1);
+    gpio_ll_set_level(s_gpio_dev, GPIO_TCK, 1);
 
     if (tdo_req) {
         s_total_tdo_bits++;
-        s_tdo_bytes[(s_total_tdo_bits - 1) / 8] |= (gpio_get_level(GPIO_TDI) << ((s_total_tdo_bits - 1) % 8));
+        s_tdo_bytes[(s_total_tdo_bits - 1) / 8] |= (gpio_ll_get_level(s_gpio_dev, GPIO_TDI) << ((s_total_tdo_bits - 1) % 8));
     }
 
-    gpio_set_level(GPIO_TCK, 0);
+    gpio_ll_set_level(s_gpio_dev, GPIO_TCK, 0);
 }
 
 int jtag_get_proto_caps(uint16_t *dest)
@@ -303,11 +306,11 @@ void jtag_task(void *pvParameters)
     int prev_cmd = CMD_SRST0, rep_cnt = 0;
 
     while (1) {
-        gpio_set_level(LED_JTAG, LED_JTAG_OFF);
+        gpio_ll_set_level(s_gpio_dev, LED_JTAG, LED_JTAG_OFF);
         char *nibbles = (char *)xRingbufferReceive(usb_rcvbuf,
                         &cnt,
                         portMAX_DELAY);
-        gpio_set_level(LED_JTAG, LED_JTAG_ON);
+        gpio_ll_set_level(s_gpio_dev, LED_JTAG, LED_JTAG_ON);
 
         ESP_LOG_BUFFER_HEXDUMP(TAG, nibbles, cnt, ESP_LOG_DEBUG);
 
