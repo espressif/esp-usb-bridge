@@ -211,7 +211,7 @@ static int usb_send(const uint8_t *buf, int size)
     return size;
 }
 
-static void do_jtag_one(uint8_t tdo_req, uint8_t tms, uint8_t tdi)
+inline static void do_jtag_one(uint8_t tdo_req, uint8_t tms, uint8_t tdi)
 {
     gpio_ll_set_level(s_gpio_dev, GPIO_TDO, tdi);
     gpio_ll_set_level(s_gpio_dev, GPIO_TMS, tms);
