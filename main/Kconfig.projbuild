@@ -33,19 +33,19 @@ menu "Bridge Configuration"
         default 5
 
     config BRIDGE_GPIO_TDI
-        int "GPIO pin for the TDI signal"
+        int "GPIO pin for the target TDI signal"
         default 3
 
     config BRIDGE_GPIO_TDO
-        int "GPIO pin for the TDO signal"
+        int "GPIO pin for the target TDO signal"
         default 9
 
     config BRIDGE_GPIO_TCK
-        int "GPIO pin for the TCK signal"
+        int "GPIO pin for the target TCK signal"
         default 10
 
     config BRIDGE_GPIO_TMS
-        int "GPIO pin for the TMS signal"
+        int "GPIO pin for the target TMS signal"
         default 8
 
     config BRIDGE_GPIO_LED1

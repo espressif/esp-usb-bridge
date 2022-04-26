@@ -121,14 +121,14 @@ static void init_jtag_gpio()
 {
     gpio_config_t io_conf = {
         .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = (1ULL << GPIO_TDO) | (1ULL << GPIO_TCK) | (1ULL << GPIO_TMS),
+        .pin_bit_mask = (1ULL << GPIO_TDI) | (1ULL << GPIO_TCK) | (1ULL << GPIO_TMS),
         .pull_down_en = 0,
         .pull_up_en = 0,
     };
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL << GPIO_TDI);
+    io_conf.pin_bit_mask = (1ULL << GPIO_TDO);
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
     ESP_LOGI(TAG, "JTAG GPIO init done");
@@ -213,14 +213,14 @@ static int usb_send(const uint8_t *buf, int size)
 
 inline static void do_jtag_one(uint8_t tdo_req, uint8_t tms, uint8_t tdi)
 {
-    gpio_ll_set_level(s_gpio_dev, GPIO_TDO, tdi);
+    gpio_ll_set_level(s_gpio_dev, GPIO_TDI, tdi);
     gpio_ll_set_level(s_gpio_dev, GPIO_TMS, tms);
 
     gpio_ll_set_level(s_gpio_dev, GPIO_TCK, 1);
 
     if (tdo_req) {
         s_total_tdo_bits++;
-        s_tdo_bytes[(s_total_tdo_bits - 1) / 8] |= (gpio_ll_get_level(s_gpio_dev, GPIO_TDI) << ((s_total_tdo_bits - 1) % 8));
+        s_tdo_bytes[(s_total_tdo_bits - 1) / 8] |= (gpio_ll_get_level(s_gpio_dev, GPIO_TDO) << ((s_total_tdo_bits - 1) % 8));
     }
 
     gpio_ll_set_level(s_gpio_dev, GPIO_TCK, 0);
