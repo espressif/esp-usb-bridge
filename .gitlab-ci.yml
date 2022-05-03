@@ -13,7 +13,6 @@ variables:
   variables:
     CHIP_NAME: "esp32s2"
   script:
-    - git submodule update --init --recursive
     - IDF_TARGET=${CHIP_NAME} idf.py build
     - cd build
     - esptool.py --chip ${CHIP_NAME} merge_bin -o ${EUB_APP_NAME}_merged.bin @flash_args
