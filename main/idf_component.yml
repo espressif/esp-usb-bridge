@@ -1,5 +1,5 @@
 ## IDF Component Manager Manifest File
 dependencies:
-  espressif/esp-serial-flasher: "~0.0.2"
+  espressif/esp-serial-flasher: "~0.0.3"
   idf:
     version: ">=4.3.0"

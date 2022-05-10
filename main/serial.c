@@ -107,7 +107,7 @@ static void uart_event_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-static esp_err_t usb_wait_for_tx(uint32_t block_time_ms)
+static esp_err_t usb_wait_for_tx(const uint32_t block_time_ms)
 {
     if (xSemaphoreTake(usb_tx_done, pdMS_TO_TICKS(block_time_ms)) != pdTRUE) {
         return ESP_ERR_TIMEOUT;
@@ -153,7 +153,7 @@ static void usb_sender_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-void tud_cdc_tx_complete_cb(uint8_t itf)
+void tud_cdc_tx_complete_cb(const uint8_t itf)
 {
     if (!serial_init_finished) {
         // This is a callback function which can be invoked without running start_serial_task()
@@ -171,7 +171,7 @@ void tud_cdc_tx_complete_cb(uint8_t itf)
     xSemaphoreGive(usb_tx_done);
 }
 
-void tud_cdc_rx_cb(uint8_t itf)
+void tud_cdc_rx_cb(const uint8_t itf)
 {
     if (!serial_init_finished) {
         // This is a callback function which can be invoked without running start_serial_task()
@@ -196,7 +196,7 @@ void tud_cdc_rx_cb(uint8_t itf)
     gpio_set_level(LED_RX, LED_RX_OFF);
 }
 
-void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const *p_line_coding)
+void tud_cdc_line_coding_cb(const uint8_t itf, cdc_line_coding_t const *p_line_coding)
 {
     static int last_bit_rate = -1;
     if (last_bit_rate != p_line_coding->bit_rate) {
@@ -205,7 +205,7 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const *p_line_coding)
     }
 }
 
-void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
+void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
 {
     if (!serial_init_finished) {
         // This is a callback function which can be invoked without running start_serial_task()
@@ -270,7 +270,7 @@ static void state_change_timer_cb(void *arg)
     gpio_set_level(GPIO_RST, true);
 }
 
-static void init_state_change_timer()
+static void init_state_change_timer(void)
 {
     const esp_timer_create_args_t timer_args = {
         .callback = state_change_timer_cb,
@@ -323,12 +323,12 @@ void start_serial_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-void serial_set(bool enable)
+void serial_set(const bool enable)
 {
     serial_read_enabled = enable;
 }
 
-bool serial_set_baudrate(int baud)
+bool serial_set_baudrate(const int baud)
 {
     return uart_set_baudrate(SLAVE_UART_NUM, baud) == ESP_OK;
 }

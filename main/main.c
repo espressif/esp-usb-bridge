@@ -55,7 +55,7 @@ enum {
     ITF_NUM_TOTAL
 };
 
-static tusb_desc_device_t descriptor_config = {
+static const tusb_desc_device_t descriptor_config = {
     .bLength = sizeof(descriptor_config),
     .bDescriptorType = TUSB_DESC_DEVICE,
     .bcdUSB = 0x0200,
@@ -133,7 +133,7 @@ uint8_t const *tud_descriptor_device_cb(void)
     return (uint8_t const *) &descriptor_config;
 }
 
-static void init_serial_no()
+static void init_serial_no(void)
 {
     uint8_t m[MAC_BYTES] = {0};
     esp_err_t ret = esp_efuse_mac_get_default(m);
@@ -147,7 +147,7 @@ static void init_serial_no()
              "%02X%02X%02X%02X%02X%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
-uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
+uint16_t const *tud_descriptor_string_cb(const uint8_t index, const uint16_t langid)
 {
     uint8_t chr_count;
 
@@ -214,7 +214,7 @@ static void tusb_device_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-static void init_led_gpios()
+static void init_led_gpios(void)
 {
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;

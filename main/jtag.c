@@ -84,7 +84,7 @@ static esp_chip_model_t s_target_model;
 static TaskHandle_t s_task_handle = NULL;
 static gpio_dev_t *const s_gpio_dev = GPIO_HAL_GET_HW(GPIO_PORT_0);
 
-bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const *request)
+bool tud_vendor_control_xfer_cb(const uint8_t rhport, const uint8_t stage, tusb_control_request_t const *request)
 {
     // nothing to with DATA & ACK stage
     if (stage != CONTROL_STAGE_SETUP) {
@@ -117,7 +117,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
     return false;
 }
 
-static void init_jtag_gpio()
+static void init_jtag_gpio(void)
 {
     gpio_config_t io_conf = {
         .mode = GPIO_MODE_OUTPUT,
@@ -201,7 +201,7 @@ static void usb_send_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-static int usb_send(const uint8_t *buf, int size)
+static int usb_send(const uint8_t *buf, const int size)
 {
     if (xRingbufferSend(usb_sndbuf, buf, size, pdMS_TO_TICKS(1000)) != pdTRUE) {
         ESP_LOGE(TAG, "Cannot write to usb_sndbuf ringbuffer (free %d of %d)!",
@@ -211,7 +211,7 @@ static int usb_send(const uint8_t *buf, int size)
     return size;
 }
 
-inline static void do_jtag_one(uint8_t tdo_req, uint8_t tms, uint8_t tdi)
+inline static void do_jtag_one(const uint8_t tdo_req, const uint8_t tms, const uint8_t tdi)
 {
     gpio_ll_set_level(s_gpio_dev, GPIO_TDI, tdi);
     gpio_ll_set_level(s_gpio_dev, GPIO_TMS, tms);
@@ -285,7 +285,7 @@ void jtag_task(void *pvParameters)
         CMD_REP0, CMD_REP1, CMD_REP2, CMD_REP3
     };
 
-    struct {
+    const struct {
         uint8_t tdo_req;
         uint8_t tms;
         uint8_t tdi;
@@ -315,7 +315,7 @@ void jtag_task(void *pvParameters)
         ESP_LOG_BUFFER_HEXDUMP(TAG, nibbles, cnt, ESP_LOG_DEBUG);
 
         for (size_t n = 0; n < cnt * 2 ; n++) {
-            int cmd = (n & 1) ? (nibbles[n / 2] & 0x0F) : (nibbles[n / 2] >> 4);
+            const int cmd = (n & 1) ? (nibbles[n / 2] & 0x0F) : (nibbles[n / 2] >> 4);
             int cmd_exec = cmd, cmd_rpt_cnt = 1;
 
             switch (cmd) {
