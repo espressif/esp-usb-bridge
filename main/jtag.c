@@ -83,12 +83,19 @@ static uint16_t s_usb_sent_bits = 0;
 static esp_chip_model_t s_target_model;
 static TaskHandle_t s_jtag_task_handle = NULL;
 static TaskHandle_t s_usb_rx_task_handle = NULL;
+static TaskHandle_t s_usb_tx_task_handle = NULL;
 static gpio_dev_t *const s_gpio_dev = GPIO_HAL_GET_HW(GPIO_PORT_0);
 
 void tud_vendor_rx_cb(uint8_t itf)
 {
     (void)itf;
     xTaskNotifyGive(s_usb_rx_task_handle);
+}
+
+void tud_mount_cb(void)
+{
+    ESP_LOGI(TAG, "Mounted");
+    xTaskNotifyGive(s_usb_tx_task_handle);
 }
 
 bool tud_vendor_control_xfer_cb(const uint8_t rhport, const uint8_t stage, tusb_control_request_t const *request)
@@ -172,13 +179,13 @@ static void usb_reader_task(void *pvParameters)
 static void usb_send_task(void *pvParameters)
 {
     uint8_t local_buf[CFG_TUD_VENDOR_TX_BUFSIZE];
-    for (;;) {
-        if (!tud_vendor_n_mounted(0)) {
-            ESP_LOGD(TAG, "USB connection is not available!");
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            continue;
-        }
 
+    /* When the device is mounted the tud_mount_cb will notify this task. */
+    ESP_LOGD(TAG, "Waiting for the device to be mounted...");
+    (void)ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    ESP_LOGD(TAG, "Device mounted!");
+
+    for (;;) {
         size_t n = 0;
         uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_sndbuf, &n, portMAX_DELAY, sizeof(local_buf));
         memcpy(local_buf, buf, n);
@@ -280,7 +287,8 @@ void jtag_task(void *pvParameters)
         eub_abort();
     }
 
-    if (xTaskCreate(usb_send_task, "usb_send_task", 4 * 1024, NULL, uxTaskPriorityGet(NULL) + 1, NULL) != pdPASS) {
+    if (xTaskCreate(usb_send_task, "usb_send_task", 4 * 1024, NULL,
+                    uxTaskPriorityGet(NULL) + 1, &s_usb_tx_task_handle) != pdPASS) {
         ESP_LOGE(TAG, "Cannot create USB send task!");
         eub_abort();
     }
