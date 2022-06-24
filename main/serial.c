@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdlib.h>
+#include <stdatomic.h>
 #include "esp_log.h"
 #include "esp_idf_version.h"
 #include "freertos/FreeRTOS.h"
@@ -46,8 +47,8 @@ static SemaphoreHandle_t usb_tx_done = NULL;
 
 static esp_timer_handle_t state_change_timer;
 
-static bool serial_init_finished = false;
-static bool serial_read_enabled = false;
+static atomic_bool serial_init_finished = false;
+static atomic_bool serial_read_enabled = false;
 
 static void uart_event_task(void *pvParameters)
 {

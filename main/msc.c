@@ -147,13 +147,13 @@ static msc_boot_sector_t msc_disk_boot_sector = {
     .end_marker = 0xAA55,
 };
 
-static uint8_t msc_disk_fat_table_sector0[] = {
+static const uint8_t msc_disk_fat_table_sector0[] = {
     0xF8, 0xFF,
     0xFF, 0xFF,
     0xFF, 0xFF, // Cluster no. 2 - Readme file start and end
 };
 
-static uint8_t msc_disk_readme_sector0[] =
+static const uint8_t msc_disk_readme_sector0[] =
     "Use 'idf.py uf2' to generate an UF2 binary. Drop the generated file into this disk in order to flash the device. \
 \r\n";
 
@@ -174,7 +174,7 @@ static uint8_t msc_disk_root_directory_sector0[] = {
     GET_BYTE(MSC_README_SIZE, 0), GET_BYTE(MSC_README_SIZE, 1), GET_BYTE(MSC_README_SIZE, 2), GET_BYTE(MSC_README_SIZE, 3), // size
 };
 
-void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16], uint8_t product_rev[4])
+void tud_msc_inquiry_cb(const uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16], uint8_t product_rev[4])
 {
     (void) lun;
 
@@ -189,10 +189,8 @@ void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16
     memcpy(product_rev, rev, strlen(rev));
 }
 
-bool tud_msc_test_unit_ready_cb(uint8_t lun)
+bool tud_msc_test_unit_ready_cb(const uint8_t lun)
 {
-    (void) lun;
-
     ESP_LOGD(TAG, "tud_msc_test_unit_ready_cb() invoked");
 
     if (ejected) {
@@ -203,7 +201,7 @@ bool tud_msc_test_unit_ready_cb(uint8_t lun)
     return true;
 }
 
-void tud_msc_capacity_cb(uint8_t lun, uint32_t *block_count, uint16_t *block_size)
+void tud_msc_capacity_cb(const uint8_t lun, uint32_t *block_count, uint16_t *block_size)
 {
     (void) lun;
 
@@ -212,10 +210,9 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t *block_count, uint16_t *block_siz
     *block_size  = FAT_SECTOR_SIZE;
 }
 
-bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, bool load_eject)
+bool tud_msc_start_stop_cb(const uint8_t lun, const uint8_t power_condition, const bool start, const bool load_eject)
 {
     (void) lun;
-    (void) power_condition;
 
     ESP_LOGI(TAG, "tud_msc_start_stop_cb() invoked, power_condition=%d, start=%d, load_eject=%d", power_condition,
              start, load_eject);
@@ -242,7 +239,7 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, boo
 #define IS_LBA_README(lba)    ((lba) >= FIRST_README_SECTOR && (lba) < FIRST_ELSE_SECTOR)
 #define IS_LBA_ELSE(lba)      ((lba) >= FIRST_ELSE_SECTOR)
 
-int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize)
+int32_t tud_msc_read10_cb(const uint8_t lun, const uint32_t lba, const uint32_t offset, void *buffer, const uint32_t bufsize)
 {
     ESP_LOGD(TAG, "tud_msc_read10_cb() invoked, lun=%d, lba=%d, offset=%d, bufsize=%d", lun, lba, offset, bufsize);
 
@@ -276,7 +273,7 @@ int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void *buff
     }
 
     if (left_to_do > 0) {
-        memset(buffer + done, 0, left_to_do);
+        memset((uint8_t *)buffer + done, 0, left_to_do);
     }
 
     return bufsize;
@@ -306,7 +303,7 @@ typedef struct {
 
 #define UF2_ESP8266_ID      0x7eab61ed
 
-static const char *chipid_to_name(uint32_t id)
+static const char *chipid_to_name(const uint32_t id)
 {
     // IDs can be found at https://github.com/Microsoft/uf2
     switch (id) {
@@ -332,7 +329,7 @@ static int msc_last_block_written = -1;
 static int msc_chunk_size;
 static int msc_blocks;
 
-static bool msc_change_baudrate(uint32_t chip_id, uint32_t baud)
+static bool msc_change_baudrate(const uint32_t chip_id, const uint32_t baud)
 {
     if (chip_id == UF2_ESP8266_ID) {
         return true;
@@ -340,7 +337,7 @@ static bool msc_change_baudrate(uint32_t chip_id, uint32_t baud)
     return (esp_loader_change_baudrate(baud) == ESP_LOADER_SUCCESS) && serial_set_baudrate(baud);
 }
 
-int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize)
+int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t offset, uint8_t *buffer, const uint32_t bufsize)
 {
     ESP_LOGD(TAG, "tud_msc_write10_cb() invoked, lun=%d, lba=%d, offset=%d", lun, lba, offset);
     ESP_LOG_BUFFER_HEXDUMP(TAG, buffer, bufsize, ESP_LOG_DEBUG);
@@ -433,8 +430,9 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
     return bufsize;
 }
 
-int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, uint16_t bufsize)
+int32_t tud_msc_scsi_cb(const uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, const uint16_t bufsize)
 {
+    (void) buffer;
     int32_t ret;
 
     ESP_LOGD(TAG, "tud_msc_scsi_cb() invoked. bufsize=%d", bufsize);
