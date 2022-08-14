@@ -233,8 +233,8 @@ inline static void do_jtag_one(const uint8_t tdo_req, const uint8_t tms, const u
     gpio_ll_set_level(s_gpio_dev, GPIO_TCK, 1);
 
     if (tdo_req) {
+        s_tdo_bytes[s_total_tdo_bits / 8] |= (gpio_ll_get_level(s_gpio_dev, GPIO_TDO) << (s_total_tdo_bits % 8));
         s_total_tdo_bits++;
-        s_tdo_bytes[(s_total_tdo_bits - 1) / 8] |= (gpio_ll_get_level(s_gpio_dev, GPIO_TDO) << ((s_total_tdo_bits - 1) % 8));
     }
 
     gpio_ll_set_level(s_gpio_dev, GPIO_TCK, 0);
