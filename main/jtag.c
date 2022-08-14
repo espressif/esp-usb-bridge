@@ -166,7 +166,7 @@ static void usb_reader_task(void *pvParameters)
                 }
             }
 
-            if (xRingbufferGetCurFreeSize(usb_rcvbuf) < 0.8 * USB_RCVBUF_SIZE) {
+            if (xRingbufferGetCurFreeSize(usb_rcvbuf) < (USB_RCVBUF_SIZE * 8) / 10) {
                 ESP_LOGW(TAG, "Ringbuffer is getting full!");
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }
@@ -197,7 +197,7 @@ static void usb_send_task(void *pvParameters)
                 // registers then the USB buffer will fill up very quickly. It is everything fine until there is space
                 // in the usb_sndbuf ringbuffer.
                 const size_t ring_free = xRingbufferGetCurFreeSize(usb_sndbuf);
-                if (ring_free < 0.3 * USB_SNDBUF_SIZE) {
+                if (ring_free < (USB_SNDBUF_SIZE * 3) / 10) {
                     ESP_LOGW(TAG, "USB send buffer is full, usb_sndbuf ringbuffer is getting full "
                              "(has %d free bytes of %d)", ring_free, USB_SNDBUF_SIZE);
                 }
