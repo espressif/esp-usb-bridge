@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "esp_log.h"
 #include "tusb.h"
@@ -241,7 +242,7 @@ bool tud_msc_start_stop_cb(const uint8_t lun, const uint8_t power_condition, con
 
 int32_t tud_msc_read10_cb(const uint8_t lun, const uint32_t lba, const uint32_t offset, void *buffer, const uint32_t bufsize)
 {
-    ESP_LOGD(TAG, "tud_msc_read10_cb() invoked, lun=%d, lba=%d, offset=%d, bufsize=%d", lun, lba, offset, bufsize);
+    ESP_LOGD(TAG, "tud_msc_read10_cb() invoked, lun=%d, lba=%" PRId32 ", offset=%" PRId32 ", bufsize=%" PRId32, lun, lba, offset, bufsize);
 
     const uint8_t *addr = NULL;
     size_t size = FAT_SECTOR_SIZE;
@@ -339,7 +340,7 @@ static bool msc_change_baudrate(const uint32_t chip_id, const uint32_t baud)
 
 int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t offset, uint8_t *buffer, const uint32_t bufsize)
 {
-    ESP_LOGD(TAG, "tud_msc_write10_cb() invoked, lun=%d, lba=%d, offset=%d", lun, lba, offset);
+    ESP_LOGD(TAG, "tud_msc_write10_cb() invoked, lun=%d, lba=%" PRId32 ", offset=%" PRId32, lun, lba, offset);
     ESP_LOG_BUFFER_HEXDUMP(TAG, buffer, bufsize, ESP_LOG_DEBUG);
 
     assert(bufsize == UF2_BLOCK_SIZE);
@@ -360,11 +361,11 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
                 // TODO check MD5 optionally based on Kconfig option
             }
 
-            ESP_LOGI(TAG, "LBA %d: UF2 block %d of %d for chip %s at %#08x with length %d", lba, p->block_no, p->blocks,
+            ESP_LOGI(TAG, "LBA %" PRId32 ": UF2 block %" PRId32 " of %" PRId32 " for chip %s at %#08" PRIx32 " with length %" PRId32, lba, p->block_no, p->blocks,
                      chip_name, p->addr, p->payload_size);
 
             if (msc_last_block_written + 1 != p->block_no) {
-                ESP_LOGE(TAG, "Trying to write block no. %d but last time %d was written!", p->block_no,
+                ESP_LOGE(TAG, "Trying to write block no. %" PRId32 " but last time %d was written!", p->block_no,
                          msc_last_block_written);
                 return 0;
             }
@@ -387,7 +388,7 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
                 msc_blocks = p->blocks;
                 const uint32_t image_size = msc_blocks * msc_chunk_size;
                 if (esp_loader_flash_start(p->addr, image_size, msc_chunk_size) != ESP_LOADER_SUCCESS) {
-                    ESP_LOGE(TAG, "Ereasing flash failed at addr %d of length %d with block size %d", p->addr,
+                    ESP_LOGE(TAG, "Ereasing flash failed at addr %" PRId32 " of length %" PRId32 " with block size %" PRId32, p->addr,
                              image_size, p->payload_size);
                     return 0;
                 }
@@ -396,19 +397,19 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
 
 
             if (p->payload_size > msc_chunk_size) {
-                ESP_LOGE(TAG, "UF2 block %d is of size %d and should be at most %d", p->block_no, p->payload_size,
+                ESP_LOGE(TAG, "UF2 block %" PRId32 " is of size %" PRId32 " and should be at most %d", p->block_no, p->payload_size,
                          msc_chunk_size);
                 eub_abort();
             }
 
             if (p->blocks != msc_blocks) {
-                ESP_LOGE(TAG, "UF2 block %d has %d as total block number but it should be %d", p->block_no, p->blocks,
+                ESP_LOGE(TAG, "UF2 block %" PRId32 " has %" PRId32 " as total block number but it should be %d", p->block_no, p->blocks,
                          msc_blocks);
                 eub_abort();
             }
 
             if (esp_loader_flash_write((void *) p->data, p->payload_size) != ESP_LOADER_SUCCESS) {
-                ESP_LOGE(TAG, "UF2 block %d of %d could not be written at %#08x with length %d", p->block_no, p->blocks,
+                ESP_LOGE(TAG, "UF2 block %" PRId32 " of %" PRId32 " could not be written at %#08" PRIx32 " with length %" PRId32, p->block_no, p->blocks,
                          p->addr, p->payload_size);
                 eub_abort();
             }

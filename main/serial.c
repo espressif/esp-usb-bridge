@@ -14,6 +14,8 @@
 
 #include <stdlib.h>
 #include <stdatomic.h>
+#include <inttypes.h>
+
 #include "esp_log.h"
 #include "esp_idf_version.h"
 #include "freertos/FreeRTOS.h"
@@ -184,7 +186,7 @@ void tud_cdc_rx_cb(const uint8_t itf)
     const uint32_t rx_size = tud_cdc_n_read(itf, buf, CONFIG_USB_CDC_RX_BUFSIZE);
     if (rx_size > 0) {
         gpio_set_level(LED_RX, LED_RX_ON);
-        ESP_LOGD(TAG, "CDC -> UART (%d bytes)", rx_size);
+        ESP_LOGD(TAG, "CDC -> UART (%" PRId32 " bytes)", rx_size);
         ESP_LOG_BUFFER_HEXDUMP("CDC -> UART", buf, rx_size, ESP_LOG_DEBUG);
 
         const int transferred = uart_write_bytes(SLAVE_UART_NUM, buf, rx_size);
