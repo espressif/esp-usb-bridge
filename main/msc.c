@@ -457,7 +457,7 @@ int32_t tud_msc_scsi_cb(const uint8_t lun, uint8_t const scsi_cmd[16], void *buf
     return ret;
 }
 
-void msc_task(void *pvParameters)
+void msc_init(void)
 {
     char volume_label[FAT_VOLUME_NAME_SIZE + 1] = CONFIG_BRIDGE_MSC_VOLUME_LABEL; // +1 because the config value is 0-terminated
     // fill the volume_label with spaces up to length FAT_VOLUME_NAME_SIZE
@@ -471,5 +471,4 @@ void msc_task(void *pvParameters)
     ESP_LOG_BUFFER_HEXDUMP("root", msc_disk_root_directory_sector0, sizeof(msc_disk_root_directory_sector0), ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "MSC disk RAM usage: %d bytes", sizeof(msc_boot_sector_t) + sizeof(msc_disk_fat_table_sector0) +
              sizeof(msc_disk_root_directory_sector0) + sizeof(msc_disk_readme_sector0));
-    vTaskDelete(NULL);
 }

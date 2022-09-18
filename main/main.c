@@ -248,9 +248,9 @@ void app_main(void)
     configure_pins(&hal);
 
     tusb_init();
+    msc_init();
+    serial_init();
+    jtag_init();
 
     xTaskCreate(tusb_device_task, "tusb_device_task", 4 * 1024, NULL, 5, NULL);
-    xTaskCreate(msc_task, "msc_task", 4 * 1024, NULL, 5, NULL);
-    xTaskCreate(start_serial_task, "start_serial_task", 4 * 1024, NULL, 5, NULL);
-    xTaskCreate(jtag_task, "jtag_task", 4 * 1024, NULL, 5, NULL);
 }

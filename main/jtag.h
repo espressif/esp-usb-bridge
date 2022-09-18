@@ -31,6 +31,6 @@
 
 int jtag_get_proto_caps(uint16_t *dest);
 int jtag_get_target_model(void);
-void jtag_task(void *pvParameters);
+void jtag_init(void);
 void jtag_task_suspend(void);
 void jtag_task_resume(void);

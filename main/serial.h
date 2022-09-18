@@ -14,6 +14,6 @@
 
 #pragma once
 
-void start_serial_task(void *pvParameters);
+void serial_init(void);
 void serial_set(const bool enable);
 bool serial_set_baudrate(const int baud);

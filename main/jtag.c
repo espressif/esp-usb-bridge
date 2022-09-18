@@ -82,14 +82,28 @@ static uint16_t s_total_tdo_bits = 0;
 static uint16_t s_usb_sent_bits = 0;
 static esp_chip_model_t s_target_model;
 static TaskHandle_t s_jtag_task_handle = NULL;
-static TaskHandle_t s_usb_rx_task_handle = NULL;
 static TaskHandle_t s_usb_tx_task_handle = NULL;
 static gpio_dev_t *const s_gpio_dev = GPIO_HAL_GET_HW(GPIO_PORT_0);
 
 void tud_vendor_rx_cb(uint8_t itf)
 {
     (void)itf;
-    xTaskNotifyGive(s_usb_rx_task_handle);
+
+    uint8_t buf[CFG_TUD_VENDOR_RX_BUFSIZE];
+    uint32_t r;
+
+    while ((r = tud_vendor_n_read(0, buf, sizeof(buf))) > 0) {
+        if (xRingbufferSend(usb_rcvbuf, buf, r, pdMS_TO_TICKS(1000)) != pdTRUE) {
+            ESP_LOGE(TAG, "Cannot write to usb_rcvbuf ringbuffer (free %d of %d)!",
+                     xRingbufferGetCurFreeSize(usb_rcvbuf), USB_RCVBUF_SIZE);
+            eub_abort();
+        }
+    }
+
+    if (xRingbufferGetCurFreeSize(usb_rcvbuf) < (USB_RCVBUF_SIZE * 8) / 10) {
+        ESP_LOGW(TAG, "Ringbuffer is getting full!");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
 
 void tud_mount_cb(void)
@@ -149,31 +163,6 @@ static void init_jtag_gpio(void)
 
     gpio_set_level(GPIO_TMS, 1);
     gpio_set_level(GPIO_TCK, 0);
-}
-
-static void usb_reader_task(void *pvParameters)
-{
-    uint8_t buf[CFG_TUD_VENDOR_RX_BUFSIZE];
-    for (;;) {
-        /* When data are available the tud_vendor_rx_cb will notify this task. */
-        if (ulTaskNotifyTake(pdTRUE, portMAX_DELAY)) {
-            uint32_t r;
-            while ((r = tud_vendor_n_read(0, buf, sizeof(buf))) > 0) {
-                if (xRingbufferSend(usb_rcvbuf, buf, r, pdMS_TO_TICKS(1000)) != pdTRUE) {
-                    ESP_LOGE(TAG, "Cannot write to usb_rcvbuf ringbuffer (free %d of %d)!",
-                             xRingbufferGetCurFreeSize(usb_rcvbuf), USB_RCVBUF_SIZE);
-                    eub_abort();
-                }
-            }
-
-            if (xRingbufferGetCurFreeSize(usb_rcvbuf) < (USB_RCVBUF_SIZE * 8) / 10) {
-                ESP_LOGW(TAG, "Ringbuffer is getting full!");
-                vTaskDelay(pdMS_TO_TICKS(1000));
-            }
-            taskYIELD();
-        }
-    }
-    vTaskDelete(NULL);
 }
 
 static void usb_send_task(void *pvParameters)
@@ -265,34 +254,8 @@ void jtag_task_resume(void)
     }
 }
 
-void jtag_task(void *pvParameters)
+static void jtag_task(void *pvParameters)
 {
-    s_jtag_task_handle = xTaskGetCurrentTaskHandle();
-    init_jtag_gpio();
-
-    usb_rcvbuf = xRingbufferCreate(USB_RCVBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
-    if (!usb_rcvbuf) {
-        ESP_LOGE(TAG, "Cannot allocate USB receive buffer!");
-        eub_abort();
-    }
-    if (xTaskCreate(usb_reader_task, "usb_reader_task", 4 * 1024, NULL,
-                    uxTaskPriorityGet(NULL) - 1, &s_usb_rx_task_handle) != pdPASS) {
-        ESP_LOGE(TAG, "Cannot create USB reader task!");
-        eub_abort();
-    }
-
-    usb_sndbuf = xRingbufferCreate(USB_SNDBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
-    if (!usb_sndbuf) {
-        ESP_LOGE(TAG, "Cannot allocate USB send buffer!");
-        eub_abort();
-    }
-
-    if (xTaskCreate(usb_send_task, "usb_send_task", 4 * 1024, NULL,
-                    uxTaskPriorityGet(NULL) + 1, &s_usb_tx_task_handle) != pdPASS) {
-        ESP_LOGE(TAG, "Cannot create USB send task!");
-        eub_abort();
-    }
-
     enum e_cmds {
         CMD_CLK_0 = 0, CMD_CLK_1, CMD_CLK_2, CMD_CLK_3,
         CMD_CLK_4, CMD_CLK_5, CMD_CLK_6, CMD_CLK_7,
@@ -316,6 +279,8 @@ void jtag_task(void *pvParameters)
         { 0, 1, 0 }, //CMD_SRST0
         { 0, 1, 0 }, //CMD_SRST1
     };
+
+    s_jtag_task_handle = xTaskGetCurrentTaskHandle();
 
     size_t cnt = 0;
     int prev_cmd = CMD_SRST0, rep_cnt = 0;
@@ -401,4 +366,32 @@ void jtag_task(void *pvParameters)
     }
 
     vTaskDelete(NULL);
+}
+
+void jtag_init(void)
+{
+    init_jtag_gpio();
+
+    usb_rcvbuf = xRingbufferCreate(USB_RCVBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
+    if (!usb_rcvbuf) {
+        ESP_LOGE(TAG, "Cannot allocate USB receive buffer!");
+        eub_abort();
+    }
+
+    usb_sndbuf = xRingbufferCreate(USB_SNDBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
+    if (!usb_sndbuf) {
+        ESP_LOGE(TAG, "Cannot allocate USB send buffer!");
+        eub_abort();
+    }
+
+    if (xTaskCreate(usb_send_task, "usb_send_task", 4 * 1024, NULL,
+                    uxTaskPriorityGet(NULL) + 1, &s_usb_tx_task_handle) != pdPASS) {
+        ESP_LOGE(TAG, "Cannot create USB send task!");
+        eub_abort();
+    }
+
+    if (xTaskCreate(jtag_task, "jtag_task", 4 * 1024, NULL, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Cannot create JTAG task!");
+        eub_abort();
+    }
 }

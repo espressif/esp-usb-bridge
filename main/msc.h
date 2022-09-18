@@ -17,4 +17,4 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-void msc_task(void *pvParameters);
+void msc_init(void);

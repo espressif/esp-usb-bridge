@@ -49,7 +49,6 @@ static SemaphoreHandle_t usb_tx_done = NULL;
 
 static esp_timer_handle_t state_change_timer;
 
-static atomic_bool serial_init_finished = false;
 static atomic_bool serial_read_enabled = false;
 
 static void uart_event_task(void *pvParameters)
@@ -158,12 +157,6 @@ static void usb_sender_task(void *pvParameters)
 
 void tud_cdc_tx_complete_cb(const uint8_t itf)
 {
-    if (!serial_init_finished) {
-        // This is a callback function which can be invoked without running start_serial_task()
-        ESP_LOGW(TAG, "Tasks for the serial interface hasn't been initialized!");
-        return;
-    }
-
     if (xSemaphoreTake(usb_tx_requested, 0) != pdTRUE) {
         /* Semaphore should have been given before write attempt.
             Sometimes tinyusb can send one more cb even xfer_complete len is zero
@@ -176,13 +169,8 @@ void tud_cdc_tx_complete_cb(const uint8_t itf)
 
 void tud_cdc_rx_cb(const uint8_t itf)
 {
-    if (!serial_init_finished) {
-        // This is a callback function which can be invoked without running start_serial_task()
-        ESP_LOGW(TAG, "Tasks for the serial interface hasn't been initialized!");
-        return;
-    }
-
     uint8_t buf[CONFIG_USB_CDC_RX_BUFSIZE];
+
     const uint32_t rx_size = tud_cdc_n_read(itf, buf, CONFIG_USB_CDC_RX_BUFSIZE);
     if (rx_size > 0) {
         gpio_set_level(LED_RX, LED_RX_ON);
@@ -210,12 +198,6 @@ void tud_cdc_line_coding_cb(const uint8_t itf, cdc_line_coding_t const *p_line_c
 
 void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
 {
-    if (!serial_init_finished) {
-        // This is a callback function which can be invoked without running start_serial_task()
-        ESP_LOGW(TAG, "Tasks for the serial interface hasn't been initialized!");
-        return;
-    }
-
     // The following transformation of DTR & RTS signals to BOOT & RST is done based on auto reset circutry shown in
     // schematics of ESP boards.
 
@@ -282,7 +264,7 @@ static void init_state_change_timer(void)
     ESP_ERROR_CHECK(esp_timer_create(&timer_args, &state_change_timer));
 }
 
-void start_serial_task(void *pvParameters)
+void serial_init(void)
 {
     const loader_esp32_config_t serial_conf = {
         .baud_rate = SLAVE_UART_DEFAULT_BAUD,
@@ -316,14 +298,11 @@ void start_serial_task(void *pvParameters)
             ESP_LOGE(TAG, "Cannot create ringbuffer for USB sender");
             eub_abort();
         }
-        serial_init_finished = true;
         serial_read_enabled = true;
     } else {
         ESP_LOGE(TAG, "loader_port_serial_init failed");
         eub_abort();
     }
-
-    vTaskDelete(NULL);
 }
 
 void serial_set(const bool enable)
