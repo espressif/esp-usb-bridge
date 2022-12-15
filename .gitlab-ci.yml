@@ -3,7 +3,6 @@ stages:
 
 # Global variables
 variables:
-  ESP_IDF_TAG_LATEST: "latest"
   ESP_IDF_TAG_v44: "release-v4.4"
   ESP_IDF_TAG_v43: "release-v4.3"
   EUB_APP_NAME: "bridge"
@@ -31,10 +30,6 @@ variables:
       - build/${EUB_APP_NAME}_merged.bin
     expire_in: 2 weeks
 
-build_latest:
-  extends: .build_template
-  image: espressif/idf:$ESP_IDF_TAG_LATEST
-
 build_v44:
   extends: .build_template
   image: espressif/idf:$ESP_IDF_TAG_v44
@@ -45,7 +40,7 @@ build_v43:
 
 pre_commit:
   stage: build
-  image: espressif/idf:$ESP_IDF_TAG_LATEST
+  image: espressif/idf:$ESP_IDF_TAG_v44
   except:
     - master
   script:

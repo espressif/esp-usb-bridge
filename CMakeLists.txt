@@ -6,7 +6,13 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 if(${IDF_VERSION_MAJOR} LESS 4 AND ${IDF_VERSION_MINOR} LESS 3)
     message(FATAL_ERROR "ESP-IDF v${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR} is not supported! "
-        "Please use v4.3 or newer.")
+        "Please use v4.3 or v4.4.")
+endif()
+
+
+if(${IDF_VERSION_MAJOR} GREATER_EQUAL 5)
+    message(FATAL_ERROR "ESP-IDF v${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR} is not supported by the legacy version of esp-usb-bridge!"
+        "Please use the master branch instead.")
 endif()
 
 project(bridge)

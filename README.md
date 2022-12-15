@@ -15,14 +15,14 @@ Note that while this file readme files mentions ESP32-S2 chip, this project can 
 
 ## How to Compile the Project
 
-[ESP-IDF](https://github.com/espressif/esp-idf) v4.3 or newer can be used to compile the project. Please read the
+[ESP-IDF](https://github.com/espressif/esp-idf) v4.3 or v4.4 can be used to compile the project. Please read the
 documentation of ESP-IDF for setting up the environment.
 
 - `idf.py menuconfig` can be used to change the default configuration. The project-specific settings are in the "Bridge Configuration" sub-menu.
 - `idf.py build` will build the project binaries.
 - `idf.py -p PORT flash monitor` will flash the ESP32-S2 and open the terminal program for monitoring. Please note that PORT is the serial port created by an USB-to-UART chip connected to the serial interface of ESP32-S2 (not the direct USB interface provided by ESP32-S2). This serial connection has to be established only for flashing. The ESP USB Bridge can work through the USB interface after that.
 
-The initial flashing can be done by other means as well as it is pointed out in [this guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/api-guides/usb-otg-console.html#uploading-the-application).
+The initial flashing can be done by other means as well as it is pointed out in [this guide](https://docs.espressif.com/projects/esp-idf/en/release-v4.4/esp32s2/api-guides/usb-otg-console.html#uploading-the-application).
 
 ## Development Board
 
@@ -66,7 +66,7 @@ espusbjtag vid_pid 0x303a 0x1002
 espusbjtag caps_descriptor 0x030A  # string descriptor index:10
 ```
 
-The JTAG interface might need some additional setup to work. Please consult the [documentation of ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/jtag-debugging/configure-ft2232h-jtag.html) for achieving this.
+The JTAG interface might need some additional setup to work. Please consult the [documentation of ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/release-v4.4/esp32/api-guides/jtag-debugging/configure-ft2232h-jtag.html) for achieving this.
 
 ## Mass Storage Device
 
@@ -93,7 +93,7 @@ We welcome contributions to this project in the form of bug reports, feature req
 
 Issue reports and feature requests can be submitted using Github Issues: https://github.com/espressif/esp-usb-bridge/issues. Please check if the issue has already been reported before opening a new one.
 
-Contributions in the form of pull requests should follow ESP-IDF project's [contribution guidelines](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/contribute/index.html). 
+Contributions in the form of pull requests should follow ESP-IDF project's [contribution guidelines](https://docs.espressif.com/projects/esp-idf/en/release-v4.4/esp32/contribute/index.html). 
 
 Additionally please install [pre-commit](https://pre-commit.com/#install) hooks before committing code:
 ```bash
