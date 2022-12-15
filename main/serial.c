@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string.h>
 #include <stdlib.h>
 #include <stdatomic.h>
 #include <inttypes.h>
 
+#include "tusb_config.h"
+#include "tusb.h"
 #include "esp_log.h"
 #include "esp_idf_version.h"
 #include "freertos/FreeRTOS.h"
@@ -23,7 +26,6 @@
 #include "freertos/ringbuf.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
-#include "tinyusb.h"
 #include "sdkconfig.h"
 #include "esp_loader.h"
 #include "esp32_port.h"
@@ -122,10 +124,10 @@ static void usb_sender_task(void *pvParameters)
     while (1) {
         size_t ringbuf_received;
         uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_sendbuf, &ringbuf_received, pdMS_TO_TICKS(100),
-                       CONFIG_USB_CDC_TX_BUFSIZE);
+                       CFG_TUD_CDC_TX_BUFSIZE);
 
         if (buf) {
-            uint8_t int_buf[CONFIG_USB_CDC_TX_BUFSIZE];
+            uint8_t int_buf[CFG_TUD_CDC_TX_BUFSIZE];
             memcpy(int_buf, buf, ringbuf_received);
             vRingbufferReturnItem(usb_sendbuf, (void *) buf);
 
@@ -169,9 +171,9 @@ void tud_cdc_tx_complete_cb(const uint8_t itf)
 
 void tud_cdc_rx_cb(const uint8_t itf)
 {
-    uint8_t buf[CONFIG_USB_CDC_RX_BUFSIZE];
+    uint8_t buf[CFG_TUD_CDC_RX_BUFSIZE];
 
-    const uint32_t rx_size = tud_cdc_n_read(itf, buf, CONFIG_USB_CDC_RX_BUFSIZE);
+    const uint32_t rx_size = tud_cdc_n_read(itf, buf, CFG_TUD_CDC_RX_BUFSIZE);
     if (rx_size > 0) {
         gpio_set_level(LED_RX, LED_RX_ON);
         ESP_LOGD(TAG, "CDC -> UART (%" PRId32 " bytes)", rx_size);
@@ -281,9 +283,6 @@ void serial_init(void)
 
     if (loader_port_esp32_init(&serial_conf) == ESP_LOADER_SUCCESS) {
         ESP_LOGI(TAG, "UART & GPIO have been initialized");
-
-        gpio_set_level(GPIO_RST, 1);
-        gpio_set_level(GPIO_BOOT, 1);
 
         init_state_change_timer();
 

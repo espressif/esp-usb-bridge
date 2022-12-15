@@ -15,7 +15,7 @@ Note that while this file readme files mentions ESP32-S2 chip, this project can 
 
 ## How to Compile the Project
 
-[ESP-IDF](https://github.com/espressif/esp-idf) v4.3 or newer can be used to compile the project. Please read the
+[ESP-IDF](https://github.com/espressif/esp-idf) v5.0 or newer can be used to compile the project. Please read the
 documentation of ESP-IDF for setting up the environment.
 
 - `idf.py menuconfig` can be used to change the default configuration. The project-specific settings are in the "Bridge Configuration" sub-menu.
