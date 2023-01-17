@@ -373,6 +373,12 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
             if (p->block_no == 0) {
                 serial_set(false);
 
+                // Set the initial baud rate of the bridge only to match the default target flashing baud rate
+                if (!serial_set_baudrate(MSC_FLASH_DEFAULT_BAUDRATE)) {
+                    ESP_LOGW(TAG, "BRIDGE UART failed to change baudrate to %d", MSC_FLASH_DEFAULT_BAUDRATE);
+                    return 0;
+                }
+
                 esp_loader_connect_args_t connect_config = ESP_LOADER_CONNECT_DEFAULT();
                 if (esp_loader_connect(&connect_config) != ESP_LOADER_SUCCESS) {
                     ESP_LOGE(TAG, "ESP LOADER connection failed!");
