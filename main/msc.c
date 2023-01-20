@@ -39,8 +39,11 @@
 #include "msc.h"
 #include "util.h"
 #include "esp_loader.h"
+#include "esp_timer.h"
 #include "serial.h"
 #include "sdkconfig.h"
+#include "driver/gpio.h"
+#include "io.h"
 
 #define FAT_CLUSTERS                    (6 * 1024)
 #define FAT_SECTORS_PER_CLUSTER         8
@@ -329,6 +332,7 @@ static const char *chipid_to_name(const uint32_t id)
 static int msc_last_block_written = -1;
 static int msc_chunk_size;
 static int msc_blocks;
+static esp_timer_handle_t reset_timer;
 
 static bool msc_change_baudrate(const uint32_t chip_id, const uint32_t baud)
 {
@@ -348,6 +352,11 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
     // Linux and Windows write files differently. Windows also creates system volume information files on the first
     // mount. In an ideal case, FAT and ROOT content would be analyzed and the flash file detected.
     // However, the only reliable way to detect files for flashing is look at the content.
+
+    if (esp_timer_is_active(reset_timer)) {
+        ESP_LOGE(TAG, "Cannot flash UF2 block while waiting for the reset timer to finish");
+        return 0;
+    }
 
     if (IS_LBA_ELSE(lba)) {
         const uf2_block_t *p = (uf2_block_t *) buffer;
@@ -427,8 +436,9 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
                 if (!msc_change_baudrate(p->chip_id, MSC_FLASH_DEFAULT_BAUDRATE)) {
                     ESP_LOGW(TAG, "ESP LOADER cannot change baudrate to %d", MSC_FLASH_DEFAULT_BAUDRATE);
                 }
-                esp_loader_flash_finish(true);
-                serial_set(true);
+                esp_loader_flash_finish(false);
+                gpio_set_level(GPIO_RST, false);
+                ESP_ERROR_CHECK(esp_timer_start_once(reset_timer, SERIAL_FLASHER_RESET_HOLD_TIME_MS * 1000));
                 msc_last_block_written = -1;
             }
         }
@@ -463,6 +473,25 @@ int32_t tud_msc_scsi_cb(const uint8_t lun, uint8_t const scsi_cmd[16], void *buf
     return ret;
 }
 
+static void reset_timer_cb(void *arg)
+{
+    (void) arg;
+    gpio_set_level(GPIO_RST, true);
+    serial_set(true);
+}
+
+static void init_reset_timer(void)
+{
+    const esp_timer_create_args_t timer_args = {
+        .callback = reset_timer_cb,
+        .arg = NULL,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "msc_reset",
+        .skip_unhandled_events = false,
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &reset_timer));
+}
+
 void msc_init(void)
 {
     char volume_label[FAT_VOLUME_NAME_SIZE + 1] = CONFIG_BRIDGE_MSC_VOLUME_LABEL; // +1 because the config value is 0-terminated
@@ -477,4 +506,6 @@ void msc_init(void)
     ESP_LOG_BUFFER_HEXDUMP("root", msc_disk_root_directory_sector0, sizeof(msc_disk_root_directory_sector0), ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "MSC disk RAM usage: %d bytes", sizeof(msc_boot_sector_t) + sizeof(msc_disk_fat_table_sector0) +
              sizeof(msc_disk_root_directory_sector0) + sizeof(msc_disk_readme_sector0));
+
+    init_reset_timer();
 }
