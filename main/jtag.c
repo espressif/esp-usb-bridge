@@ -194,11 +194,13 @@ static void usb_send_task(void *pvParameters)
                 continue;
             }
             const int sent = tud_vendor_n_write(0, local_buf + transferred, MIN(space, to_send));
+            if (sent < CFG_TUD_VENDOR_EPSIZE) {
+                tud_vendor_n_flush(0);
+            }
             transferred += sent;
             to_send -= sent;
             ESP_LOGD(TAG, "Space was %d, USB sent %d bytes", space, sent);
             ESP_LOG_BUFFER_HEXDUMP("USB sent", local_buf + transferred - sent, sent, ESP_LOG_DEBUG);
-            // there seems to be no flush for vendor class
         }
     }
     vTaskDelete(NULL);
