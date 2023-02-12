@@ -16,6 +16,10 @@
 
 #include <sys/param.h>
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+#endif
+
 #define GET_BYTE(n, b)          (((n) >> ((b) * 8)) & 0xFF)
 
 #define EUB_ASSERT(condition)            do {                           \

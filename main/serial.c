@@ -284,6 +284,9 @@ void serial_init(void)
     if (loader_port_esp32_init(&serial_conf) == ESP_LOADER_SUCCESS) {
         ESP_LOGI(TAG, "UART & GPIO have been initialized");
 
+        gpio_set_level(GPIO_RST, 1);
+        gpio_set_level(GPIO_BOOT, 1);
+
         init_state_change_timer();
 
         usb_sendbuf = xRingbufferCreate(USB_SEND_RINGBUFFER_SIZE, RINGBUF_TYPE_BYTEBUF);

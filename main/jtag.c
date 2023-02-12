@@ -15,14 +15,30 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/ringbuf.h"
+
+#include "driver/gpio.h"
+#include "driver/dedic_gpio.h"
+#include "hal/dedic_gpio_cpu_ll.h"
+#include "hal/gpio_ll.h"
+#include "hal/gpio_hal.h"
+
 #include "jtag.h"
 #include "tusb.h"
 #include "sdkconfig.h"
-#include "driver/gpio.h"
 #include "util.h"
 #include "io.h"
-#include "hal/gpio_ll.h"
-#include "hal/gpio_hal.h"
+
+static dedic_gpio_bundle_handle_t gpio_in_bundle;
+static dedic_gpio_bundle_handle_t gpio_out_bundle;
+
+/* mask values depends on the location in the gpio in/out bundle arrays */
+/* outputs */
+#define GPIO_TCK_MASK       0x01
+#define GPIO_TDI_MASK       0x02
+#define GPIO_TMS_MASK       0x04
+#define GPIO_TMS_TDI_MASK   0x06
+/* inputs */
+#define GPIO_TDO_MASK       0x01
 
 #define USB_RCVBUF_SIZE             4096
 #define USB_SNDBUF_SIZE             (32*1024)
@@ -67,11 +83,11 @@ typedef struct {
 #define VEND_JTAG_GETTDO        2
 #define VEND_JTAG_SET_CHIPID    3
 
-// TCK frequency is around 750KHZ and we do not support selective clock for now.
+// TCK frequency is around 4800KHZ and we do not support selective clock for now.
 #define TCK_FREQ(khz) ((khz * 2) / 10)
 static const jtag_proto_caps_t jtag_proto_caps = {
     {.proto_ver = JTAG_PROTO_CAPS_VER, .length = sizeof(jtag_proto_caps_hdr_t) + sizeof(jtag_proto_caps_speed_apb_t)},
-    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = TCK_FREQ(750), .div_min = 1, .div_max = 1}
+    {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = TCK_FREQ(4800), .div_min = 1, .div_max = 1}
 };
 
 static RingbufHandle_t usb_rcvbuf;
@@ -149,20 +165,43 @@ static void init_jtag_gpio(void)
 {
     gpio_config_t io_conf = {
         .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = (1ULL << GPIO_TDI) | (1ULL << GPIO_TCK) | (1ULL << GPIO_TMS),
-        .pull_down_en = 0,
-        .pull_up_en = 0,
+        .pin_bit_mask = BIT64(GPIO_TDI) | BIT64(GPIO_TCK) | BIT64(GPIO_TMS),
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
     };
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL << GPIO_TDO);
+    io_conf.pin_bit_mask = BIT64(GPIO_TDO);
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 
-    ESP_LOGI(TAG, "JTAG GPIO init done");
+    int bundle_out_gpios[] = { GPIO_TCK, GPIO_TDI, GPIO_TMS };
+    int bundle_in_gpios[] = { GPIO_TDO };
 
-    gpio_set_level(GPIO_TMS, 1);
-    gpio_set_level(GPIO_TCK, 0);
+    dedic_gpio_bundle_config_t out_bundle_config = {
+        .gpio_array = bundle_out_gpios,
+        .array_size = ARRAY_SIZE(bundle_out_gpios),
+        .flags = {
+            .out_en = 1,
+        },
+    };
+
+    dedic_gpio_bundle_config_t in_bundle_config = {
+        .gpio_array = bundle_in_gpios,
+        .array_size = ARRAY_SIZE(bundle_in_gpios),
+        .flags = {
+            .in_en = 1,
+        },
+    };
+
+    dedic_gpio_new_bundle(&out_bundle_config, &gpio_out_bundle);
+    dedic_gpio_new_bundle(&in_bundle_config, &gpio_in_bundle);
+
+    dedic_gpio_cpu_ll_write_mask(GPIO_TMS_MASK, GPIO_TMS_MASK);
+    dedic_gpio_cpu_ll_write_mask(GPIO_TCK_MASK, 0);
+
+    ESP_LOGI(TAG, "JTAG GPIO init done");
 }
 
 static void usb_send_task(void *pvParameters)
@@ -216,19 +255,17 @@ static int usb_send(const uint8_t *buf, const int size)
     return size;
 }
 
-inline static void do_jtag_one(const uint8_t tdo_req, const uint8_t tms, const uint8_t tdi)
+inline static void do_jtag_one(const uint8_t tdo_req, const uint8_t tms_tdi_mask)
 {
-    gpio_ll_set_level(s_gpio_dev, GPIO_TDI, tdi);
-    gpio_ll_set_level(s_gpio_dev, GPIO_TMS, tms);
-
-    gpio_ll_set_level(s_gpio_dev, GPIO_TCK, 1);
+    dedic_gpio_cpu_ll_write_mask(GPIO_TMS_TDI_MASK, tms_tdi_mask);
+    dedic_gpio_cpu_ll_write_mask(GPIO_TCK_MASK, GPIO_TCK_MASK);
 
     if (tdo_req) {
-        s_tdo_bytes[s_total_tdo_bits / 8] |= (gpio_ll_get_level(s_gpio_dev, GPIO_TDO) << (s_total_tdo_bits % 8));
+        s_tdo_bytes[s_total_tdo_bits / 8] |= (dedic_gpio_cpu_ll_read_in() << (s_total_tdo_bits % 8));
         s_total_tdo_bits++;
     }
 
-    gpio_ll_set_level(s_gpio_dev, GPIO_TCK, 0);
+    dedic_gpio_cpu_ll_write_mask(GPIO_TCK_MASK, 0);
 }
 
 int jtag_get_proto_caps(uint16_t *dest)
@@ -267,19 +304,18 @@ static void jtag_task(void *pvParameters)
 
     const struct {
         uint8_t tdo_req;
-        uint8_t tms;
-        uint8_t tdi;
-    } pin_levels[] = {
-        { 0, 0, 0 }, //CMD_CLK_0
-        { 0, 0, 1 }, //CMD_CLK_1
-        { 0, 1, 0 }, //..
-        { 0, 1, 1 },
-        { 1, 0, 0 },
-        { 1, 0, 1 },
-        { 1, 1, 0 },
-        { 1, 1, 1 }, //CMD_CLK_7
-        { 0, 1, 0 }, //CMD_SRST0
-        { 0, 1, 0 }, //CMD_SRST1
+        uint8_t tms_tdi_mask;
+    } pin_levels[] = {                          // { tdo_req, tms, tdi }
+        { 0, 0 },                               // { 0, 0, 0 },  CMD_CLK_0
+        { 0, GPIO_TDI_MASK },                   // { 0, 0, 1 },  CMD_CLK_1
+        { 0, GPIO_TMS_MASK },                   // { 0, 1, 0 },  CMD_CLK_2
+        { 0, GPIO_TMS_TDI_MASK },               // { 0, 1, 1 },  CMD_CLK_3
+        { 1, 0 },                               // { 1, 0, 0 },  CMD_CLK_4
+        { 1, GPIO_TDI_MASK },                   // { 1, 0, 1 },  CMD_CLK_5
+        { 1, GPIO_TMS_MASK },                   // { 1, 1, 0 },  CMD_CLK_6
+        { 1, GPIO_TMS_TDI_MASK },               // { 1, 1, 1 },  CMD_CLK_7
+        { 0, GPIO_TMS_MASK },                   // { 0, 1, 0 },  CMD_SRST0
+        { 0, GPIO_TMS_MASK },                   // { 0, 1, 0 },  CMD_SRST1
     };
 
     s_jtag_task_handle = xTaskGetCurrentTaskHandle();
@@ -325,8 +361,8 @@ static void jtag_task(void *pvParameters)
 
             for (int i = 0; i < cmd_rpt_cnt; i++) {
                 if (cmd_exec < CMD_FLUSH) {
-                    do_jtag_one(pin_levels[cmd_exec].tdo_req, pin_levels[cmd_exec].tms, pin_levels[cmd_exec].tdi);
-                } else if (cmd_exec == CMD_FLUSH ) {
+                    do_jtag_one(pin_levels[cmd_exec].tdo_req, pin_levels[cmd_exec].tms_tdi_mask);
+                } else if (cmd_exec == CMD_FLUSH) {
                     s_total_tdo_bits = ROUND_UP_BITS(s_total_tdo_bits);
                     if (s_usb_sent_bits < s_total_tdo_bits) {
                         int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
