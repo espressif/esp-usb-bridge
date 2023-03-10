@@ -223,6 +223,10 @@ void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
         // This is a patch for Esptool. Esptool generates DTR=0 & RTS=1 followed by DTR=1 & RTS=0. However, a callback
         // with DTR = 1 & RTS = 1 is received between. This would prevent to put the target chip into download mode.
         ESP_ERROR_CHECK(esp_timer_start_once(state_change_timer, 10 * 1000 /*us*/));
+
+        // Enable serial read on the first connection. It can be kept enabled after disconnection because that is not
+        // causing crash of the USB subsystem.
+        serial_read_enabled = true;
     } else {
         ESP_LOGI(TAG, "DTR = %d, RTS = %d -> BOOT = %d, RST = %d", dtr, rts, boot, rst);
 
@@ -300,7 +304,10 @@ void serial_init(void)
             ESP_LOGE(TAG, "Cannot create ringbuffer for USB sender");
             eub_abort();
         }
-        serial_read_enabled = true;
+
+        // Serial read is enabled only with the first connection. This is done in order to
+        // avoid crashing the USB subsystem.
+        serial_read_enabled = false;
     } else {
         ESP_LOGE(TAG, "loader_port_serial_init failed");
         eub_abort();
