@@ -9,8 +9,6 @@ variables:
 
 .build_template:
   stage: build
-  variables:
-    CHIP_NAME: "esp32s2"
   script:
     - PEDANTIC_FLAGS="-DIDF_CI_BUILD -Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
     - export PEDANTIC_CFLAGS="${PEDANTIC_FLAGS} -Wstrict-prototypes"
@@ -30,12 +28,28 @@ variables:
       - build/${EUB_APP_NAME}_merged.bin
     expire_in: 2 weeks
 
-build_latest:
+build_latest_s2:
   extends: .build_template
+  variables:
+    CHIP_NAME: "esp32s2"
   image: espressif/idf:$ESP_IDF_TAG_LATEST
 
-build_v50:
+build_v50_s2:
   extends: .build_template
+  variables:
+    CHIP_NAME: "esp32s2"
+  image: espressif/idf:$ESP_IDF_TAG_v50
+
+build_latest_s3:
+  extends: .build_template
+  variables:
+    CHIP_NAME: "esp32s3"
+  image: espressif/idf:$ESP_IDF_TAG_LATEST
+
+build_v50_s3:
+  extends: .build_template
+  variables:
+    CHIP_NAME: "esp32s3"
   image: espressif/idf:$ESP_IDF_TAG_v50
 
 pre_commit:

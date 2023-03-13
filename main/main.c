@@ -23,7 +23,7 @@
 #include "msc.h"
 #include "hal/usb_hal.h"
 #include "soc/usb_periph.h"
-#include "esp32s2/rom/gpio.h"
+#include "rom/gpio.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "esp_idf_version.h"
