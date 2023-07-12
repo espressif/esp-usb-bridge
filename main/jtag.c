@@ -359,23 +359,22 @@ static void jtag_task(void *pvParameters)
                 break;
             }
 
-            for (int i = 0; i < cmd_rpt_cnt; i++) {
-                if (cmd_exec < CMD_FLUSH) {
+            if (cmd_exec < CMD_FLUSH) {
+                for (int i = 0; i < cmd_rpt_cnt; i++) {
                     do_jtag_one(pin_levels[cmd_exec].tdo_req, pin_levels[cmd_exec].tms_tdi_mask);
-                } else if (cmd_exec == CMD_FLUSH) {
-                    s_total_tdo_bits = ROUND_UP_BITS(s_total_tdo_bits);
-                    if (s_usb_sent_bits < s_total_tdo_bits) {
-                        int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
-                        while (waiting_to_send_bits > 0) {
-                            int send_bits = waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits;
-                            usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), send_bits / 8);
-                            s_usb_sent_bits += send_bits;
-                            waiting_to_send_bits -= send_bits;
-                        }
-                        memset(s_tdo_bytes, 0x00, sizeof(s_tdo_bytes));
-                        s_total_tdo_bits = s_usb_sent_bits = 0;
-                        continue;
+                }
+            } else if (cmd_exec == CMD_FLUSH) {
+                s_total_tdo_bits = ROUND_UP_BITS(s_total_tdo_bits);
+                if (s_usb_sent_bits < s_total_tdo_bits) {
+                    int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
+                    while (waiting_to_send_bits > 0) {
+                        int send_bits = waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits;
+                        usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), send_bits / 8);
+                        s_usb_sent_bits += send_bits;
+                        waiting_to_send_bits -= send_bits;
                     }
+                    memset(s_tdo_bytes, 0x00, sizeof(s_tdo_bytes));
+                    s_total_tdo_bits = s_usb_sent_bits = 0;
                 }
             }
 
