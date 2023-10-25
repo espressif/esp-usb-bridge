@@ -1,6 +1,6 @@
 # This file is used to pass ESP-Prog-2 specific options when building firmware for the probe
 # To pass it to the build system, set the SDKCONFIG_DEFAULTS environment environment variable like so:
-# export SDKCONFIG_DEFAULTS="sdkconfig.defaults.esp_prog2;skdconfig.defaults.esp32s3"
+# export SDKCONFIG_DEFAULTS="sdkconfig.defaults.esp_prog2;sdkconfig.defaults.esp32s3"
 
 CONFIG_BRIDGE_PRODUCT_NAME="ESP-Prog-2"
 CONFIG_BRIDGE_GPIO_BOOT=33
