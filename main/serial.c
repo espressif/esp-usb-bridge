@@ -233,7 +233,9 @@ void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
         gpio_set_level(GPIO_BOOT, boot);
         gpio_set_level(GPIO_RST, rst);
 
-        serial_set_baudrate(SLAVE_UART_DEFAULT_BAUD);
+        if (!rst) {
+            serial_set_baudrate(SLAVE_UART_DEFAULT_BAUD);
+        }
 
         // On ESP32, TDI jtag signal is on GPIO12, which is also a strapping pin that determines flash voltage.
         // If TDI is high when ESP32 is released from external reset, the flash voltage is set to 1.8V, and the chip will fail to boot.
