@@ -16,4 +16,4 @@
 
 void serial_init(void);
 void serial_set(const bool enable);
-bool serial_set_baudrate(const int baud);
+bool serial_set_baudrate(const uint32_t baud);

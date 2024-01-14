@@ -191,11 +191,7 @@ void tud_cdc_rx_cb(const uint8_t itf)
 
 void tud_cdc_line_coding_cb(const uint8_t itf, cdc_line_coding_t const *p_line_coding)
 {
-    static int last_bit_rate = -1;
-    if (last_bit_rate != p_line_coding->bit_rate) {
-        serial_set_baudrate(p_line_coding->bit_rate);
-        last_bit_rate = p_line_coding->bit_rate;
-    }
+    serial_set_baudrate(p_line_coding->bit_rate);
 }
 
 void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
@@ -321,7 +317,19 @@ void serial_set(const bool enable)
     serial_read_enabled = enable;
 }
 
-bool serial_set_baudrate(const int baud)
+bool serial_set_baudrate(const uint32_t baud)
 {
-    return uart_set_baudrate(SLAVE_UART_NUM, baud) == ESP_OK;
+    static uint32_t current_baudrate = SLAVE_UART_DEFAULT_BAUD;
+
+    if (current_baudrate == baud) {
+        return true;
+    }
+
+    esp_err_t result = uart_set_baudrate(SLAVE_UART_NUM, baud);
+
+    if (result == ESP_OK) {
+        current_baudrate = baud;
+    }
+
+    return result == ESP_OK;
 }
