@@ -191,7 +191,12 @@ void tud_cdc_rx_cb(const uint8_t itf)
 
 void tud_cdc_line_coding_cb(const uint8_t itf, cdc_line_coding_t const *p_line_coding)
 {
-    serial_set_baudrate(p_line_coding->bit_rate);
+    if (serial_set_baudrate(p_line_coding->bit_rate)) {
+        ESP_LOGI(TAG, "Baudrate set to %" PRId32 "", p_line_coding->bit_rate);
+    } else {
+        ESP_LOGE(TAG, "Could not set the baudrate to %" PRId32 "", p_line_coding->bit_rate);
+        eub_abort();
+    }
 }
 
 void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
@@ -230,7 +235,12 @@ void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
         gpio_set_level(GPIO_RST, rst);
 
         if (!rst) {
-            serial_set_baudrate(SLAVE_UART_DEFAULT_BAUD);
+            if (serial_set_baudrate(SLAVE_UART_DEFAULT_BAUD)) {
+                ESP_LOGI(TAG, "Baudrate set to %d", SLAVE_UART_DEFAULT_BAUD);
+            } else {
+                ESP_LOGE(TAG, "Could not set the baudrate to %d", SLAVE_UART_DEFAULT_BAUD);
+                eub_abort();
+            }
         }
 
         // On ESP32, TDI jtag signal is on GPIO12, which is also a strapping pin that determines flash voltage.
