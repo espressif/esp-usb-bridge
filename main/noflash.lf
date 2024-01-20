@@ -1,4 +1,5 @@
 [mapping:main]
 archive: libmain.a
 entries:
-    jtag (noflash)
+    esp_usb_jtag (noflash)
+    eub_vendord (noflash)

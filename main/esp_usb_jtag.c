@@ -1,4 +1,4 @@
-// Copyright 2020-2021 Espressif Systems (Shanghai) CO LTD
+// Copyright 2020-2024 Espressif Systems (Shanghai) CO LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,45 +11,48 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "sdkconfig.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/ringbuf.h"
-
 #include "driver/gpio.h"
 #include "driver/dedic_gpio.h"
 #include "hal/dedic_gpio_cpu_ll.h"
 #include "hal/gpio_ll.h"
 #include "hal/gpio_hal.h"
-
-#include "jtag.h"
+#include "esp_chip_info.h"
 #include "tusb.h"
-#include "sdkconfig.h"
+
+#include "eub_vendord.h"
 #include "util.h"
 #include "io.h"
 
+static const char *TAG = "esp_usb_jtag";
+
+static esp_chip_model_t s_target_model;
 static dedic_gpio_bundle_handle_t gpio_in_bundle;
 static dedic_gpio_bundle_handle_t gpio_out_bundle;
+static gpio_dev_t *const s_gpio_dev = GPIO_HAL_GET_HW(GPIO_PORT_0);
+
+static TaskHandle_t s_jtag_task_handle = NULL;
+static uint8_t s_tdo_bytes[1024];
+static uint16_t s_total_tdo_bits = 0;
+static uint16_t s_usb_sent_bits = 0;
 
 /* mask values depends on the location in the gpio in/out bundle arrays */
 /* outputs */
-#define GPIO_TCK_MASK       0x01
-#define GPIO_TDI_MASK       0x02
-#define GPIO_TMS_MASK       0x04
-#define GPIO_TMS_TDI_MASK   0x06
+#define GPIO_TCK_MASK           0x01
+#define GPIO_TDI_MASK           0x02
+#define GPIO_TMS_MASK           0x04
+#define GPIO_TMS_TDI_MASK       0x06
 /* inputs */
-#define GPIO_TDO_MASK       0x01
+#define GPIO_TDO_MASK           0x01
 
-#define USB_RCVBUF_SIZE             4096
-#define USB_SNDBUF_SIZE             (32*1024)
-
-#define ROUND_UP_BITS(x)            ((x + 7) & (~7))
-
-static const char *TAG = "bridge_jtag";
+#define ROUND_UP_BITS(x)        ((x + 7) & (~7))
 
 /* esp usb serial protocol specific definitions */
-#define JTAG_PROTO_MAX_BITS      (CFG_TUD_VENDOR_RX_BUFSIZE * 8)
-#define JTAG_PROTO_CAPS_VER 1   /*Version field. */
+#define JTAG_PROTO_MAX_BITS     (EUB_VENDORD_EPSIZE * 8)
+#define JTAG_PROTO_CAPS_VER     1   /*Version field. */
 typedef struct __attribute__((packed))
 {
     uint8_t proto_ver;  /*Protocol version. Expects JTAG_PROTO_CAPS_VER for now. */
@@ -90,44 +93,41 @@ static const jtag_proto_caps_t jtag_proto_caps = {
     {.type = JTAG_PROTO_CAPS_SPEED_APB_TYPE, .length = sizeof(jtag_proto_caps_speed_apb_t), .apb_speed_10khz = TCK_FREQ(4800), .div_min = 1, .div_max = 1}
 };
 
-static RingbufHandle_t usb_rcvbuf;
-static RingbufHandle_t usb_sndbuf;
+void eub_debug_probe_init(void) __attribute__((alias("esp_usb_jtag_init")));
+int eub_debug_probe_get_proto_caps(void *dest) __attribute__((alias("esp_usb_jtag_get_proto_caps")));
+void eub_debug_probe_task_suspend(void) __attribute__((alias("esp_usb_jtag_task_suspend")));
+void eub_debug_probe_task_resume(void) __attribute__((alias("esp_usb_jtag_task_resume")));
+bool eub_debug_probe_target_is_esp32(void) __attribute__((alias("esp_usb_jtag_target_is_esp32")));
 
-static uint8_t s_tdo_bytes[1024];
-static uint16_t s_total_tdo_bits = 0;
-static uint16_t s_usb_sent_bits = 0;
-static esp_chip_model_t s_target_model;
-static TaskHandle_t s_jtag_task_handle = NULL;
-static TaskHandle_t s_usb_tx_task_handle = NULL;
-static gpio_dev_t *const s_gpio_dev = GPIO_HAL_GET_HW(GPIO_PORT_0);
-
-void tud_vendor_rx_cb(uint8_t itf)
+static int esp_usb_jtag_get_proto_caps(void *dest)
 {
-    (void)itf;
+    memcpy(dest, (uint16_t *)&jtag_proto_caps, sizeof(jtag_proto_caps));
+    return sizeof(jtag_proto_caps);
+}
 
-    uint8_t buf[CFG_TUD_VENDOR_RX_BUFSIZE];
-    uint32_t r;
+static bool esp_usb_jtag_target_is_esp32(void)
+{
+    return s_target_model == CHIP_ESP32;
+}
 
-    while ((r = tud_vendor_n_read(0, buf, sizeof(buf))) > 0) {
-        if (xRingbufferSend(usb_rcvbuf, buf, r, pdMS_TO_TICKS(1000)) != pdTRUE) {
-            ESP_LOGE(TAG, "Cannot write to usb_rcvbuf ringbuffer (free %d of %d)!",
-                     xRingbufferGetCurFreeSize(usb_rcvbuf), USB_RCVBUF_SIZE);
-            eub_abort();
-        }
-    }
-
-    if (xRingbufferGetCurFreeSize(usb_rcvbuf) < (USB_RCVBUF_SIZE * 8) / 10) {
-        ESP_LOGW(TAG, "Ringbuffer is getting full!");
-        vTaskDelay(pdMS_TO_TICKS(1000));
+static void esp_usb_jtag_task_suspend(void)
+{
+    if (s_jtag_task_handle) {
+        vTaskSuspend(s_jtag_task_handle);
     }
 }
 
-void tud_mount_cb(void)
+static void esp_usb_jtag_task_resume(void)
 {
-    ESP_LOGI(TAG, "Mounted");
-    xTaskNotifyGive(s_usb_tx_task_handle);
+    if (s_jtag_task_handle) {
+        vTaskResume(s_jtag_task_handle);
+    }
 }
 
+/* Control settings are not directly related to the vendor class.
+   e.g; dap protocol also communicates through vendor class but handles settings within the protocol commands.
+   Therefore, we're adding the callback here to keep `eub_vendord.c` isolated and common for swd also.
+*/
 bool tud_vendor_control_xfer_cb(const uint8_t rhport, const uint8_t stage, tusb_control_request_t const *request)
 {
     // nothing to with DATA & ACK stage
@@ -204,57 +204,6 @@ static void init_jtag_gpio(void)
     ESP_LOGI(TAG, "JTAG GPIO init done");
 }
 
-static void usb_send_task(void *pvParameters)
-{
-    uint8_t local_buf[CFG_TUD_VENDOR_TX_BUFSIZE];
-
-    /* When the device is mounted the tud_mount_cb will notify this task. */
-    ESP_LOGD(TAG, "Waiting for the device to be mounted...");
-    (void)ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    ESP_LOGD(TAG, "Device mounted!");
-
-    for (;;) {
-        size_t n = 0;
-        uint8_t *buf = (uint8_t *) xRingbufferReceiveUpTo(usb_sndbuf, &n, portMAX_DELAY, sizeof(local_buf));
-        memcpy(local_buf, buf, n);
-        vRingbufferReturnItem(usb_sndbuf, (void *) buf);
-        for (int transferred = 0, to_send = n; transferred < n;) {
-            int space = tud_vendor_n_write_available(0);
-            if (space == 0) {
-                // Openocd sometime sends a lot of SCAN requests and reads them later. If these requests are 32-bit
-                // registers then the USB buffer will fill up very quickly. It is everything fine until there is space
-                // in the usb_sndbuf ringbuffer.
-                const size_t ring_free = xRingbufferGetCurFreeSize(usb_sndbuf);
-                if (ring_free < (USB_SNDBUF_SIZE * 3) / 10) {
-                    ESP_LOGW(TAG, "USB send buffer is full, usb_sndbuf ringbuffer is getting full "
-                             "(has %d free bytes of %d)", ring_free, USB_SNDBUF_SIZE);
-                }
-                vTaskDelay(1);
-                continue;
-            }
-            const int sent = tud_vendor_n_write(0, local_buf + transferred, MIN(space, to_send));
-            if (sent < CFG_TUD_VENDOR_EPSIZE) {
-                tud_vendor_n_write_flush(0);
-            }
-            transferred += sent;
-            to_send -= sent;
-            ESP_LOGD(TAG, "Space was %d, USB sent %d bytes", space, sent);
-            ESP_LOG_BUFFER_HEXDUMP("USB sent", local_buf + transferred - sent, sent, ESP_LOG_DEBUG);
-        }
-    }
-    vTaskDelete(NULL);
-}
-
-static int usb_send(const uint8_t *buf, const int size)
-{
-    if (xRingbufferSend(usb_sndbuf, buf, size, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        ESP_LOGE(TAG, "Cannot write to usb_sndbuf ringbuffer (free %d of %d)!",
-                 xRingbufferGetCurFreeSize(usb_sndbuf), USB_SNDBUF_SIZE);
-        return 0;
-    }
-    return size;
-}
-
 inline static void do_jtag_one(const uint8_t tdo_req, const uint8_t tms_tdi_mask)
 {
     dedic_gpio_cpu_ll_write_mask(GPIO_TMS_TDI_MASK, tms_tdi_mask);
@@ -268,32 +217,7 @@ inline static void do_jtag_one(const uint8_t tdo_req, const uint8_t tms_tdi_mask
     dedic_gpio_cpu_ll_write_mask(GPIO_TCK_MASK, 0);
 }
 
-int jtag_get_proto_caps(uint16_t *dest)
-{
-    memcpy(dest, (uint16_t *)&jtag_proto_caps, sizeof(jtag_proto_caps));
-    return sizeof(jtag_proto_caps);
-}
-
-int jtag_get_target_model(void)
-{
-    return s_target_model;
-}
-
-void jtag_task_suspend(void)
-{
-    if (s_jtag_task_handle) {
-        vTaskSuspend(s_jtag_task_handle);
-    }
-}
-
-void jtag_task_resume(void)
-{
-    if (s_jtag_task_handle) {
-        vTaskResume(s_jtag_task_handle);
-    }
-}
-
-static void jtag_task(void *pvParameters)
+static void esp_usb_jtag_task(void *pvParameters)
 {
     enum e_cmds {
         CMD_CLK_0 = 0, CMD_CLK_1, CMD_CLK_2, CMD_CLK_3,
@@ -325,9 +249,7 @@ static void jtag_task(void *pvParameters)
 
     while (1) {
         gpio_ll_set_level(s_gpio_dev, LED_JTAG, LED_JTAG_OFF);
-        char *nibbles = (char *)xRingbufferReceive(usb_rcvbuf,
-                        &cnt,
-                        portMAX_DELAY);
+        char *nibbles = eub_vendord_recv_acquire_item(&cnt);
         gpio_ll_set_level(s_gpio_dev, LED_JTAG, LED_JTAG_ON);
 
         ESP_LOG_BUFFER_HEXDUMP(TAG, nibbles, cnt, ESP_LOG_DEBUG);
@@ -369,7 +291,7 @@ static void jtag_task(void *pvParameters)
                     int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
                     while (waiting_to_send_bits > 0) {
                         int send_bits = waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits;
-                        usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), send_bits / 8);
+                        eub_vendord_send_acquire_item(s_tdo_bytes + (s_usb_sent_bits / 8), send_bits / 8);
                         s_usb_sent_bits += send_bits;
                         waiting_to_send_bits -= send_bits;
                     }
@@ -385,7 +307,7 @@ static void jtag_task(void *pvParameters)
             if (waiting_to_send_bits >= JTAG_PROTO_MAX_BITS) {
                 int send_bits = ROUND_UP_BITS(waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits);
                 int n_byte = send_bits / 8;
-                usb_send(s_tdo_bytes + (s_usb_sent_bits / 8), n_byte);
+                eub_vendord_send_acquire_item(s_tdo_bytes + (s_usb_sent_bits / 8), n_byte);
                 memset(s_tdo_bytes + (s_usb_sent_bits / 8), 0x00, n_byte);
                 s_usb_sent_bits += send_bits;
                 waiting_to_send_bits -= send_bits;
@@ -399,36 +321,26 @@ static void jtag_task(void *pvParameters)
             }
         }
 
-        vRingbufferReturnItem(usb_rcvbuf, (void *)nibbles);
+        eub_vendord_free_item(nibbles);
     }
 
     vTaskDelete(NULL);
 }
 
-void jtag_init(void)
+static void esp_usb_jtag_init(void)
 {
-    usb_rcvbuf = xRingbufferCreate(USB_RCVBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
-    if (!usb_rcvbuf) {
-        ESP_LOGE(TAG, "Cannot allocate USB receive buffer!");
-        eub_abort();
-    }
-
-    usb_sndbuf = xRingbufferCreate(USB_SNDBUF_SIZE, RINGBUF_TYPE_BYTEBUF);
-    if (!usb_sndbuf) {
-        ESP_LOGE(TAG, "Cannot allocate USB send buffer!");
-        eub_abort();
-    }
-
-    if (xTaskCreate(usb_send_task, "usb_send_task", 4 * 1024, NULL,
-                    uxTaskPriorityGet(NULL) + 1, &s_usb_tx_task_handle) != pdPASS) {
-        ESP_LOGE(TAG, "Cannot create USB send task!");
-        eub_abort();
-    }
-
     /* dedicated GPIO will be binded to the CPU who invokes this API */
     /* we will create a jtag task pinned to this core */
     init_jtag_gpio();
-    if (xTaskCreatePinnedToCore(jtag_task, "jtag_task", 4 * 1024, NULL, 5, NULL, esp_cpu_get_core_id()) != pdPASS) {
+
+    BaseType_t res = xTaskCreatePinnedToCore(esp_usb_jtag_task,
+                     "jtag_task",
+                     4 * 1024,
+                     NULL,
+                     EUB_VENDORD_USB_TASK_PRI + 1,
+                     NULL,
+                     esp_cpu_get_core_id());
+    if (res != pdPASS) {
         ESP_LOGE(TAG, "Cannot create JTAG task!");
         eub_abort();
     }

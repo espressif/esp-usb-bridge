@@ -19,7 +19,6 @@
 #include "freertos/task.h"
 #include "serial.h"
 #include "tusb.h"
-#include "jtag.h"
 #include "msc.h"
 #include "hal/usb_phy_types.h"
 #include "soc/usb_periph.h"
@@ -31,6 +30,8 @@
 #include "esp_mac.h"
 #include "esp_private/periph_ctrl.h"
 #include "esp_private/usb_phy.h"
+#include "eub_vendord.h"
+#include "eub_debug_probe.h"
 
 static const char *TAG = "bridge_main";
 
@@ -78,7 +79,7 @@ static const tusb_desc_device_t descriptor_config = {
 // Interface number, string index, EP Out & IN address, EP size
 #define TUD_VENDOR_EUB_DESCRIPTOR(_itfnum, _stridx, _epout, _epin, _epsize) \
   /* Interface */\
-  9, TUSB_DESC_INTERFACE, _itfnum, 0, 2, TUSB_CLASS_VENDOR_SPECIFIC, 0xFF, 0x01, _stridx,\
+  9, TUSB_DESC_INTERFACE, _itfnum, 0, 2, TUSB_CLASS_VENDOR_SPECIFIC, EUB_VENDORD_IFACE_SUBCLASS, EUB_VENDORD_IFACE_PROTOCOL, _stridx,\
   /* Endpoint Out */\
   7, TUSB_DESC_ENDPOINT, _epout, TUSB_XFER_BULK, U16_TO_U8S_LE(_epsize), 0,\
   /* Endpoint In */\
@@ -92,7 +93,7 @@ static uint8_t const desc_configuration[] = {
     TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, 0x81, 8, EPNUM_CDC, 0x80 | EPNUM_CDC, CFG_TUD_CDC_EP_BUFSIZE),
 
     // Interface number, string index, EP Out & IN address, EP size
-    TUD_VENDOR_EUB_DESCRIPTOR(ITF_NUM_VENDOR, 5, EPNUM_VENDOR, 0x80 | EPNUM_VENDOR, 64),
+    TUD_VENDOR_EUB_DESCRIPTOR(ITF_NUM_VENDOR, EUB_VENDORD_IFACE_STR_IDX, EPNUM_VENDOR, 0x80 | EPNUM_VENDOR, 64),
 
     // Interface number, string index, EP Out & EP In address, EP size
     TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, 6, EPNUM_MSC, 0x80 | EPNUM_MSC, 64),
@@ -126,6 +127,14 @@ uint8_t const *tud_descriptor_device_cb(void)
     return (uint8_t const *) &descriptor_config;
 }
 
+void tud_mount_cb(void)
+{
+    ESP_LOGI(TAG, "Mounted");
+
+    eub_vendord_start();
+    eub_debug_probe_init();
+}
+
 static void init_serial_no(void)
 {
     uint8_t m[MAC_BYTES] = {0};
@@ -147,8 +156,8 @@ uint16_t const *tud_descriptor_string_cb(const uint8_t index, const uint16_t lan
     if (index == 0) {
         memcpy(&_desc_str[1], string_desc_arr[0], 2);
         chr_count = 1;
-    } else if (index == JTAG_STR_DESC_INX) {
-        chr_count = jtag_get_proto_caps(&_desc_str[1]) / 2;
+    } else if (index == EUB_DEBUG_PROBE_STR_DESC_INX) {
+        chr_count = eub_debug_probe_get_proto_caps(&_desc_str[1]) / 2;
     } else {
         // Convert ASCII string into UTF-16
 
@@ -226,7 +235,6 @@ void app_main(void)
     tusb_init();
     msc_init();
     serial_init();
-    jtag_init();
 
     xTaskCreate(tusb_device_task, "tusb_device_task", 4 * 1024, NULL, 5, NULL);
 }

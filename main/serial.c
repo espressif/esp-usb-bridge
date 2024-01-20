@@ -34,7 +34,7 @@
 #include "util.h"
 #include "serial.h"
 #include "io.h"
-#include "jtag.h"
+#include "eub_debug_probe.h"
 
 #define SLAVE_UART_NUM          UART_NUM_1
 #define SLAVE_UART_BUF_SIZE     (2 * 1024)
@@ -247,15 +247,15 @@ void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
         // If TDI is high when ESP32 is released from external reset, the flash voltage is set to 1.8V, and the chip will fail to boot.
         // As a solution, MTDI signal forced to be low when RST is about to go high.
         static bool tdi_bootstrapping = false;
-        if (jtag_get_target_model() == CHIP_ESP32 && !tdi_bootstrapping && boot && !rst) {
-            jtag_task_suspend();
+        if (eub_debug_probe_target_is_esp32() && !tdi_bootstrapping && boot && !rst) {
+            eub_debug_probe_task_suspend();
             tdi_bootstrapping = true;
             gpio_set_level(CONFIG_BRIDGE_GPIO_TDO, 0);
             ESP_LOGW(TAG, "jtag task suspended");
         }
         if (tdi_bootstrapping && boot && rst) {
             esp_rom_delay_us(1000); /* wait for reset */
-            jtag_task_resume();
+            eub_debug_probe_task_resume();
             tdi_bootstrapping = false;
             ESP_LOGW(TAG, "jtag task resumed");
         }
