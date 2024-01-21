@@ -21,7 +21,7 @@
 #include "tusb.h"
 #include "jtag.h"
 #include "msc.h"
-#include "hal/usb_hal.h"
+#include "hal/usb_phy_types.h"
 #include "soc/usb_periph.h"
 #include "rom/gpio.h"
 #include "driver/gpio.h"
@@ -30,6 +30,7 @@
 #include "esp_system.h"
 #include "esp_mac.h"
 #include "esp_private/periph_ctrl.h"
+#include "esp_private/usb_phy.h"
 
 static const char *TAG = "bridge_main";
 
@@ -174,30 +175,6 @@ uint16_t const *tud_descriptor_string_cb(const uint8_t index, const uint16_t lan
     return _desc_str;
 }
 
-static void configure_pins(usb_hal_context_t *usb)
-{
-    /* usb_periph_iopins currently configures USB_OTG as USB Device.
-     * Introduce additional parameters in usb_hal_context_t when adding support
-     * for USB Host.
-     */
-    for (const usb_iopin_dsc_t *iopin = usb_periph_iopins; iopin->pin != -1; ++iopin) {
-        if ((usb->use_external_phy) || (iopin->ext_phy_only == 0)) {
-            gpio_pad_select_gpio(iopin->pin);
-            if (iopin->is_output) {
-                gpio_matrix_out(iopin->pin, iopin->func, false, false);
-            } else {
-                gpio_matrix_in(iopin->pin, iopin->func, false);
-                gpio_pad_input_enable(iopin->pin);
-            }
-            gpio_pad_unhold(iopin->pin);
-        }
-    }
-    if (!usb->use_external_phy) {
-        gpio_set_drive_capability(USBPHY_DM_NUM, GPIO_DRIVE_CAP_3);
-        gpio_set_drive_capability(USBPHY_DP_NUM, GPIO_DRIVE_CAP_3);
-    }
-}
-
 static void tusb_device_task(void *pvParameters)
 {
     while (1) {
@@ -224,20 +201,27 @@ static void init_led_gpios(void)
     ESP_LOGI(TAG, "LED GPIO init done");
 }
 
+static void int_usb_phy(void)
+{
+    usb_phy_config_t phy_config = {
+        .controller = USB_PHY_CTRL_OTG,
+        .target = USB_PHY_TARGET_INT,
+        .otg_mode = USB_OTG_MODE_DEVICE,
+        .otg_speed = USB_PHY_SPEED_FULL,
+        .ext_io_conf = NULL,
+        .otg_io_conf = NULL,
+    };
+    usb_phy_handle_t phy_handle;
+    usb_new_phy(&phy_config, &phy_handle);
+}
+
 void app_main(void)
 {
     init_led_gpios(); // Keep this at the begining. LEDs are used for error reporting.
 
     init_serial_no();
 
-    periph_module_reset(PERIPH_USB_MODULE);
-    periph_module_enable(PERIPH_USB_MODULE);
-
-    usb_hal_context_t hal = {
-        .use_external_phy = false
-    };
-    usb_hal_init(&hal);
-    configure_pins(&hal);
+    int_usb_phy();
 
     tusb_init();
     msc_init();
