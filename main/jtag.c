@@ -234,7 +234,7 @@ static void usb_send_task(void *pvParameters)
             }
             const int sent = tud_vendor_n_write(0, local_buf + transferred, MIN(space, to_send));
             if (sent < CFG_TUD_VENDOR_EPSIZE) {
-                tud_vendor_n_flush(0);
+                tud_vendor_n_write_flush(0);
             }
             transferred += sent;
             to_send -= sent;
