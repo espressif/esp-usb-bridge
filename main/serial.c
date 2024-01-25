@@ -33,7 +33,7 @@
 #include "esp_rom_sys.h"
 #include "util.h"
 #include "serial.h"
-#include "io.h"
+#include "esp_io.h"
 #include "eub_debug_probe.h"
 
 #define SLAVE_UART_NUM          UART_NUM_1

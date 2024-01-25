@@ -1,0 +1,70 @@
+/*
+ * SPDX-FileCopyrightText: 2020-2024 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "esp_log.h"
+#include "esp_io.h"
+
+#define GET_IDX(mask)   (__builtin_ctz(mask))
+
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+#endif
+
+dedic_gpio_bundle_handle_t s_gpio_out_bundle;
+dedic_gpio_bundle_handle_t s_gpio_io_bundle;
+gpio_dev_t *const s_gpio_dev = GPIO_LL_GET_HW(GPIO_PORT_0);
+uint32_t s_gpio_conf;
+
+static const char *TAG = "esp_io";
+
+void esp_init_jtag_pins(void)
+{
+    static int init = 0;
+
+    if (!init) {
+        gpio_config_t io_conf = {
+            .mode = GPIO_MODE_OUTPUT,
+            .pin_bit_mask = BIT64(GPIO_TDI) | BIT64(GPIO_TCK) | BIT64(GPIO_TMS),
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE,
+        };
+        ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+        io_conf.mode = GPIO_MODE_INPUT;
+        io_conf.pin_bit_mask = BIT64(GPIO_TDO);
+        ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+        int bundle_out_gpios[] = { GPIO_TCK, GPIO_TDI, GPIO_TMS };
+        int bundle_in_gpios[] = { GPIO_TDO };
+
+        dedic_gpio_bundle_config_t out_bundle_config = {
+            .gpio_array = bundle_out_gpios,
+            .array_size = ARRAY_SIZE(bundle_out_gpios),
+            .flags = {
+                .out_en = 1,
+            },
+        };
+
+        dedic_gpio_bundle_config_t in_bundle_config = {
+            .gpio_array = bundle_in_gpios,
+            .array_size = ARRAY_SIZE(bundle_in_gpios),
+            .flags = {
+                .in_en = 1,
+            },
+        };
+
+        dedic_gpio_new_bundle(&out_bundle_config, &s_gpio_out_bundle);
+        dedic_gpio_new_bundle(&in_bundle_config, &s_gpio_io_bundle);
+
+        dedic_gpio_cpu_ll_write_mask(GPIO_TMS_MASK, GPIO_TMS_MASK);
+        dedic_gpio_cpu_ll_write_mask(GPIO_TCK_MASK, 0);
+
+        init = 1;
+
+        ESP_LOGI(TAG, "JTAG GPIO init done");
+    }
+}

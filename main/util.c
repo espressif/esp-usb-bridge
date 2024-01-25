@@ -18,7 +18,7 @@
 #include "driver/gpio.h"
 #include "util.h"
 #include "sdkconfig.h"
-#include "io.h"
+#include "esp_io.h"
 
 void __attribute__((noreturn)) eub_abort(void)
 {

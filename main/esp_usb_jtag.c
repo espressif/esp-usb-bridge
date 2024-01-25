@@ -15,38 +15,20 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/gpio.h"
-#include "driver/dedic_gpio.h"
-#include "hal/dedic_gpio_cpu_ll.h"
-#include "hal/gpio_ll.h"
-#include "hal/gpio_hal.h"
 #include "esp_chip_info.h"
 #include "tusb.h"
 
 #include "eub_vendord.h"
 #include "util.h"
-#include "io.h"
+#include "esp_io.h"
 
 static const char *TAG = "esp_usb_jtag";
 
 static esp_chip_model_t s_target_model;
-static dedic_gpio_bundle_handle_t gpio_in_bundle;
-static dedic_gpio_bundle_handle_t gpio_out_bundle;
-static gpio_dev_t *const s_gpio_dev = GPIO_HAL_GET_HW(GPIO_PORT_0);
-
 static TaskHandle_t s_jtag_task_handle = NULL;
 static uint8_t s_tdo_bytes[1024];
 static uint16_t s_total_tdo_bits = 0;
 static uint16_t s_usb_sent_bits = 0;
-
-/* mask values depends on the location in the gpio in/out bundle arrays */
-/* outputs */
-#define GPIO_TCK_MASK           0x01
-#define GPIO_TDI_MASK           0x02
-#define GPIO_TMS_MASK           0x04
-#define GPIO_TMS_TDI_MASK       0x06
-/* inputs */
-#define GPIO_TDO_MASK           0x01
 
 #define ROUND_UP_BITS(x)        ((x + 7) & (~7))
 
@@ -161,60 +143,17 @@ bool tud_vendor_control_xfer_cb(const uint8_t rhport, const uint8_t stage, tusb_
     return false;
 }
 
-static void init_jtag_gpio(void)
-{
-    gpio_config_t io_conf = {
-        .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = BIT64(GPIO_TDI) | BIT64(GPIO_TCK) | BIT64(GPIO_TMS),
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&io_conf));
-
-    io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = BIT64(GPIO_TDO);
-    ESP_ERROR_CHECK(gpio_config(&io_conf));
-
-    int bundle_out_gpios[] = { GPIO_TCK, GPIO_TDI, GPIO_TMS };
-    int bundle_in_gpios[] = { GPIO_TDO };
-
-    dedic_gpio_bundle_config_t out_bundle_config = {
-        .gpio_array = bundle_out_gpios,
-        .array_size = ARRAY_SIZE(bundle_out_gpios),
-        .flags = {
-            .out_en = 1,
-        },
-    };
-
-    dedic_gpio_bundle_config_t in_bundle_config = {
-        .gpio_array = bundle_in_gpios,
-        .array_size = ARRAY_SIZE(bundle_in_gpios),
-        .flags = {
-            .in_en = 1,
-        },
-    };
-
-    dedic_gpio_new_bundle(&out_bundle_config, &gpio_out_bundle);
-    dedic_gpio_new_bundle(&in_bundle_config, &gpio_in_bundle);
-
-    dedic_gpio_cpu_ll_write_mask(GPIO_TMS_MASK, GPIO_TMS_MASK);
-    dedic_gpio_cpu_ll_write_mask(GPIO_TCK_MASK, 0);
-
-    ESP_LOGI(TAG, "JTAG GPIO init done");
-}
-
 inline static void do_jtag_one(const uint8_t tdo_req, const uint8_t tms_tdi_mask)
 {
-    dedic_gpio_cpu_ll_write_mask(GPIO_TMS_TDI_MASK, tms_tdi_mask);
-    dedic_gpio_cpu_ll_write_mask(GPIO_TCK_MASK, GPIO_TCK_MASK);
+    esp_gpio_write_tmstck(tms_tdi_mask);
+    esp_gpio_tck_set();
 
     if (tdo_req) {
-        s_tdo_bytes[s_total_tdo_bits / 8] |= (dedic_gpio_cpu_ll_read_in() << (s_total_tdo_bits % 8));
+        s_tdo_bytes[s_total_tdo_bits / 8] |= (esp_gpio_tdo_read() << (s_total_tdo_bits % 8));
         s_total_tdo_bits++;
     }
 
-    dedic_gpio_cpu_ll_write_mask(GPIO_TCK_MASK, 0);
+    esp_gpio_tck_clr();
 }
 
 static void esp_usb_jtag_task(void *pvParameters)
@@ -248,9 +187,9 @@ static void esp_usb_jtag_task(void *pvParameters)
     int prev_cmd = CMD_SRST0, rep_cnt = 0;
 
     while (1) {
-        gpio_ll_set_level(s_gpio_dev, LED_JTAG, LED_JTAG_OFF);
+        esp_gpio_jtag_led_off();
         char *nibbles = eub_vendord_recv_acquire_item(&cnt);
-        gpio_ll_set_level(s_gpio_dev, LED_JTAG, LED_JTAG_ON);
+        esp_gpio_jtag_led_on();
 
         ESP_LOG_BUFFER_HEXDUMP(TAG, nibbles, cnt, ESP_LOG_DEBUG);
 
@@ -331,7 +270,7 @@ static void esp_usb_jtag_init(void)
 {
     /* dedicated GPIO will be binded to the CPU who invokes this API */
     /* we will create a jtag task pinned to this core */
-    init_jtag_gpio();
+    esp_init_jtag_pins();
 
     BaseType_t res = xTaskCreatePinnedToCore(esp_usb_jtag_task,
                      "jtag_task",

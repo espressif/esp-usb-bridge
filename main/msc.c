@@ -43,7 +43,7 @@
 #include "serial.h"
 #include "sdkconfig.h"
 #include "driver/gpio.h"
-#include "io.h"
+#include "esp_io.h"
 
 #define FAT_CLUSTERS                    (6 * 1024)
 #define FAT_SECTORS_PER_CLUSTER         8
