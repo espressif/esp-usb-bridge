@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "sdkconfig.h"
+
+#if CONFIG_BRIDGE_DEBUG_IFACE_JTAG
+
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -230,7 +233,7 @@ static void esp_usb_jtag_task(void *pvParameters)
                     int waiting_to_send_bits = s_total_tdo_bits - s_usb_sent_bits;
                     while (waiting_to_send_bits > 0) {
                         int send_bits = waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits;
-                        eub_vendord_send_acquire_item(s_tdo_bytes + (s_usb_sent_bits / 8), send_bits / 8);
+                        eub_vendord_send_item(s_tdo_bytes + (s_usb_sent_bits / 8), send_bits / 8);
                         s_usb_sent_bits += send_bits;
                         waiting_to_send_bits -= send_bits;
                     }
@@ -246,7 +249,7 @@ static void esp_usb_jtag_task(void *pvParameters)
             if (waiting_to_send_bits >= JTAG_PROTO_MAX_BITS) {
                 int send_bits = ROUND_UP_BITS(waiting_to_send_bits > JTAG_PROTO_MAX_BITS ? JTAG_PROTO_MAX_BITS : waiting_to_send_bits);
                 int n_byte = send_bits / 8;
-                eub_vendord_send_acquire_item(s_tdo_bytes + (s_usb_sent_bits / 8), n_byte);
+                eub_vendord_send_item(s_tdo_bytes + (s_usb_sent_bits / 8), n_byte);
                 memset(s_tdo_bytes + (s_usb_sent_bits / 8), 0x00, n_byte);
                 s_usb_sent_bits += send_bits;
                 waiting_to_send_bits -= send_bits;
@@ -284,3 +287,5 @@ static void esp_usb_jtag_init(void)
         eub_abort();
     }
 }
+
+#endif /* CONFIG_BRIDGE_DEBUG_IFACE_JTAG */

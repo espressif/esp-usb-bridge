@@ -21,6 +21,6 @@
 #define EUB_VENDORD_USB_TASK_PRI    4
 
 void eub_vendord_start(void);
-int eub_vendord_send_acquire_item(const void *buf, const size_t size);
+int eub_vendord_send_item(const void *buf, const size_t size);
 void *eub_vendord_recv_acquire_item(size_t *item_size);
 void eub_vendord_free_item(void *item);

@@ -1,2 +1,10 @@
 DEFAULT:
   options: "--style=otbs --attach-namespaces --attach-classes --indent=spaces=4 --convert-tabs --align-pointer=name --align-reference=name --keep-one-line-statements --pad-header --pad-oper --unpad-paren --pad-comma"
+
+not_formatted:
+  check: false
+  include:
+    - "components/DAP/"
+    - "components/DAP/Config/"
+    - "components/DAP/Include/"
+    - "components/DAP/Source/"

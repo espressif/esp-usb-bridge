@@ -163,7 +163,7 @@ static void usb_send_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-int eub_vendord_send_acquire_item(const void *buf, const size_t size)
+int eub_vendord_send_item(const void *buf, const size_t size)
 {
     if (xRingbufferSend(s_eub_vendord_itf.usb_sndbuf, buf, size, pdMS_TO_TICKS(1000)) != pdTRUE) {
         ESP_LOGE(TAG, "Cannot write to usb_sndbuf ringbuffer (free %d of %d)!",

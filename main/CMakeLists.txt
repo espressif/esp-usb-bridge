@@ -4,7 +4,8 @@ idf_component_register(SRCS "main.c"
                             "msc.c"
                             "util.c"
                             "eub_vendord.c"
-                       REQUIRES "tinyusb" "driver" "esp_timer" "usb" "platform"
+                            "eub_swd.c"
+                       REQUIRES "tinyusb" "driver" "esp_timer" "usb" "platform" "DAP"
                        LDFRAGMENTS "noflash.lf"
                        INCLUDE_DIRS "." "public_include")
 

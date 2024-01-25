@@ -1,24 +1,28 @@
 stages:
-  - build
+  - pre_check
+  - build_latest
+  - build_v5.2
+  - build_v5.1
+  - build_v5.0
 
 # Global variables
 variables:
   ESP_IDF_TAG_LATEST: "latest"
   ESP_IDF_TAG_v50: "release-v5.0"
+  ESP_IDF_TAG_v51: "release-v5.1"
+  ESP_IDF_TAG_v52: "release-v5.2"
   EUB_APP_NAME: "bridge"
 
 .build_template:
-  stage: build
   tags:
     - build
   script:
     - PEDANTIC_FLAGS="-DIDF_CI_BUILD -Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
     - export PEDANTIC_CFLAGS="${PEDANTIC_FLAGS} -Wstrict-prototypes"
     - export PEDANTIC_CXXFLAGS="${PEDANTIC_FLAGS}"
-    - IDF_TARGET=${CHIP_NAME} idf.py build
+    - idf.py -DIDF_TARGET=${CHIP_NAME} -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.${EUB_DEBUG_IFACE}.defaults" build
     - cd build
     - esptool.py --chip ${CHIP_NAME} merge_bin -o ${EUB_APP_NAME}_merged.bin @flash_args
-
   artifacts:
     paths:
       - build/flasher_args.json
@@ -29,33 +33,148 @@ variables:
       - build/partition_table/partition-table.bin
       - build/${EUB_APP_NAME}_merged.bin
     expire_in: 2 weeks
+  needs:
+    - job: pre_commit
+      optional: true
 
-build_latest_s2:
+.build_latest_template:
+  stage: build_latest
   extends: .build_template
-  variables:
-    CHIP_NAME: "esp32s2"
   image: espressif/idf:$ESP_IDF_TAG_LATEST
 
-build_v50_s2:
+.build_v52_template:
+  stage: build_v5.2
   extends: .build_template
+  image: espressif/idf:$ESP_IDF_TAG_v52
+
+.build_v51_template:
+  stage: build_v5.1
+  extends: .build_template
+  image: espressif/idf:$ESP_IDF_TAG_v51
+
+.build_v50_template:
+  stage: build_v5.0
+  extends: .build_template
+  image: espressif/idf:$ESP_IDF_TAG_v50
+
+##############
+# IDF master #
+##############
+
+build_latest_s2_jtag:
+  extends: .build_latest_template
   variables:
     CHIP_NAME: "esp32s2"
-  image: espressif/idf:$ESP_IDF_TAG_v50
+    EUB_DEBUG_IFACE: "jtag"
 
-build_latest_s3:
-  extends: .build_template
+build_latest_s2_swd:
+  extends: .build_latest_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "swd"
+
+build_latest_s3_jtag:
+  extends: .build_latest_template
   variables:
     CHIP_NAME: "esp32s3"
-  image: espressif/idf:$ESP_IDF_TAG_LATEST
+    EUB_DEBUG_IFACE: "jtag"
 
-build_v50_s3:
-  extends: .build_template
+build_latest_s3_swd:
+  extends: .build_latest_template
   variables:
     CHIP_NAME: "esp32s3"
-  image: espressif/idf:$ESP_IDF_TAG_v50
+    EUB_DEBUG_IFACE: "swd"
+
+##############
+#  IDF v5.2  #
+##############
+
+build_v52_s2_jtag:
+  extends: .build_v52_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v52_s2_swd:
+  extends: .build_v52_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "swd"
+
+build_v52_s3_jtag:
+  extends: .build_v52_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v52_s3_swd:
+  extends: .build_v52_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "swd"
+
+##############
+#  IDF v5.1  #
+##############
+
+build_v51_s2_jtag:
+  extends: .build_v51_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v51_s2_swd:
+  extends: .build_v51_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "swd"
+
+build_v51_s3_jtag:
+  extends: .build_v51_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v51_s3_swd:
+  extends: .build_v51_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "swd"
+
+##############
+#  IDF v5.0  #
+##############
+
+build_v50_s2_jtag:
+  extends: .build_v50_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v50_s2_swd:
+  extends: .build_v50_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "swd"
+
+build_v50_s3_jtag:
+  extends: .build_v50_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v50_s3_swd:
+  extends: .build_v50_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "swd"
+
+##############
+#  PRE CHECK #
+##############
 
 pre_commit:
-  stage: build
+  stage: pre_check
   tags:
     - build
   image: espressif/idf:$ESP_IDF_TAG_LATEST
