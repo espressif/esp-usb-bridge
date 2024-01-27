@@ -8,7 +8,7 @@ The concept of ESP USB Bridge is shown in the following figure.
 
 ESP USB Bridge creates a composite USB device accessible from the PC when they are connected through a USB cable. The main features are the following.
 - *Serial bridge*: The developer can run [esptool](https://github.com/espressif/esptool) or connect a terminal program to the serial port provided by the USB CDC. The communication is transferred in both directions between the PC and the target MCU through the ESP USB bridge.
-- *JTAG bridge*: [openocd-esp32](https://github.com/espressif/openocd-esp32) can be run on the PC which will connect to the ESP USB Bridge. The bridge MCU acts again as bridge between the PC and the MCU, and transfers JTAG communication between them in both directions.
+- *JTAG/SWD bridge*: [openocd-esp32](https://github.com/espressif/openocd-esp32) can be run on the PC which will connect to the ESP USB Bridge. The bridge MCU acts again as bridge between the PC and the MCU, and transfers JTAG/SWD communication between them in both directions.
 - *Mass storage device*: USB Mass storage device is created which can be accessed by a file explorer in the PC. Binaries in UF2 format can be copied to this disk and the bridge MCU will use them to flash the target MCU. Currently ESP USB Bridge is capable of flashing various Espressif microcontrollers.
 
 ## How to Compile the Project
@@ -66,6 +66,20 @@ espusbjtag caps_descriptor 0x030A  # string descriptor index:10
 ```
 
 The JTAG interface might need some additional setup to work. Please consult the [documentation of ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/jtag-debugging/configure-ft2232h-jtag.html) for achieving this.
+
+## SWD Bridge
+
+The ESP USB Bridge also provides an ARM Serial Wire Debug (SWD) device using the CMSIS-DAP protocol.
+
+On the OpenOCD side, CMSIS-DAP-related updates are continuously synced from the mainline to the Espressif fork. Therefore, it is always recommended to use the latest release or the latest master branch.
+
+The following command can be used to access the SWD port on a target MCU
+```bash
+openocd -s tcl -f interface/cmsis-dap.cfg -f target/<target.cfg>.cfg -c 'adapter speed 5000'
+```
+Make sure to replace `target.cfg` with the actual target config file.
+
+Currently, the ESP USB bridge supports only USB-bulk transfers as a backend. The HID backend is not supported.
 
 ## Mass Storage Device
 

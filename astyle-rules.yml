@@ -8,3 +8,4 @@ not_formatted:
     - "components/DAP/Config/"
     - "components/DAP/Include/"
     - "components/DAP/Source/"
+    - "images/"
