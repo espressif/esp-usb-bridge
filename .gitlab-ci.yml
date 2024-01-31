@@ -9,6 +9,8 @@ variables:
 
 .build_template:
   stage: build
+  tags:
+    - build
   script:
     - PEDANTIC_FLAGS="-DIDF_CI_BUILD -Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
     - export PEDANTIC_CFLAGS="${PEDANTIC_FLAGS} -Wstrict-prototypes"
@@ -54,6 +56,8 @@ build_v50_s3:
 
 pre_commit:
   stage: build
+  tags:
+    - build
   image: espressif/idf:$ESP_IDF_TAG_LATEST
   except:
     - master
