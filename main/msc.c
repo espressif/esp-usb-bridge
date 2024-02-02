@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 // The mass storage class creates a mountable USB device into which UF2 formatted files can be dropped to flash the
 // target ESP device. Some necessary initialization is done by running the msc_task(). The task is deleted after the
 // initialization. The module contains the following callbacks from the tinyusb USB stack.
@@ -283,7 +282,6 @@ int32_t tud_msc_read10_cb(const uint8_t lun, const uint32_t lba, const uint32_t 
     return bufsize;
 }
 
-
 #define UF2_BLOCK_SIZE                  512
 #define UF2_DATA_SIZE                   476
 #define UF2_FIRST_MAGIC                 0x0A324655
@@ -321,6 +319,14 @@ static const char *chipid_to_name(const uint32_t id)
         return "ESP32-C3";
     case 0xc47e5767:
         return "ESP32-S3";
+    case 0x2b88d29c:
+        return "ESP32-C2";
+    case 0x332726f6:
+        return "ESP32-H2";
+    case 0x540ddf62:
+        return "ESP32-C6";
+    case 0x3d308e94:
+        return "ESP32-P4";
     default:
         return "unknown";
     }
@@ -409,7 +415,6 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
                 }
                 ESP_LOGD(TAG, "ESP LOADER flash start success!");
             }
-
 
             if (p->payload_size > msc_chunk_size) {
                 ESP_LOGE(TAG, "UF2 block %" PRId32 " is of size %" PRId32 " and should be at most %d", p->block_no, p->payload_size,
