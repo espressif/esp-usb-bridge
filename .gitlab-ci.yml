@@ -1,6 +1,8 @@
 stages:
   - pre_check
   - build_latest
+  - build_v5.4
+  - build_v5.3
   - build_v5.2
   - build_v5.1
   - build_v5.0

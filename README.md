@@ -109,3 +109,9 @@ Additionally please install [pre-commit](https://pre-commit.com/#install) hooks 
 pip install pre-commit
 pre-commit install
 ```
+---
+This project is universal and can be used with various hardware setups. For detailed hardware setup requirements, please refer to the [Development Board](#development-board) section. However, if you own an ESP-Prog2, you can use the following link to try to flash it using ESP Launchpad.
+
+<a href="https://espressif.github.io/esp-launchpad/?flashConfigURL=https://espressif.github.io/esp-usb-bridge/launchpad.toml">
+    <img alt="Try it with ESP Launchpad" src="https://espressif.github.io/esp-launchpad/assets/try_with_launchpad.png" width="250" height="70">
+</a>

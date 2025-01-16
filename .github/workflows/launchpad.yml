@@ -1,0 +1,83 @@
+name: Build and deploy to Launchpad
+
+# Trigger the workflow on push to master branch or manually from the Actions tab
+on:
+  release:
+    types: [published]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.4
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install external dependencies
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y tree
+
+      # Build the application using ESP-IDF, merge the binaries and save as esp-prog2.bin
+      - name: Build application
+        run: |
+          . $IDF_PATH/export.sh
+          export SDKCONFIG_DEFAULTS="sdkconfig.defaults.esp_prog2;sdkconfig.defaults.esp32s3"
+          idf.py build
+          mkdir -p binaries
+          idf.py merge-bin -o esp-prog2.bin
+
+      # Create page files for deployment
+      # Copy the built binaries and the launchpad.toml file to the binaries directory
+      # and generate an index.html file with the file tree of the binaries directory.
+      - name: Create page files
+        run: |
+          cp build/esp-prog2.bin binaries/
+          cp launchpad.toml binaries/
+          cd binaries
+          tree -q -H '.' -L 1 -T 'esp-usb-bridge Launchpad Artifacts' -shi --charset utf-8 -I "index.html" -o index.html
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: binaries/
+
+  # Job to deploy the application to GitHub Pages
+  deploy:
+    needs: build
+
+    # Necessary permissions to deploy to GitHub Pages
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download the built binaries artifact
+      - name: Download built files
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: binaries/
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload built files to GitHub pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages
+          path: binaries/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
