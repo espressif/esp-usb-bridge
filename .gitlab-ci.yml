@@ -11,6 +11,8 @@ variables:
   ESP_IDF_TAG_v50: "release-v5.0"
   ESP_IDF_TAG_v51: "release-v5.1"
   ESP_IDF_TAG_v52: "release-v5.2"
+  ESP_IDF_TAG_v53: "release-v5.3"
+  ESP_IDF_TAG_v54: "release-v5.4"
   EUB_APP_NAME: "bridge"
 
 .build_template:
@@ -41,6 +43,16 @@ variables:
   stage: build_latest
   extends: .build_template
   image: espressif/idf:$ESP_IDF_TAG_LATEST
+
+.build_v54_template:
+  stage: build_v5.4
+  extends: .build_template
+  image: espressif/idf:$ESP_IDF_TAG_v54
+
+.build_v53_template:
+  stage: build_v5.3
+  extends: .build_template
+  image: espressif/idf:$ESP_IDF_TAG_v53
 
 .build_v52_template:
   stage: build_v5.2
@@ -81,6 +93,62 @@ build_latest_s3_jtag:
 
 build_latest_s3_swd:
   extends: .build_latest_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "swd"
+
+##############
+#  IDF v5.4  #
+##############
+
+build_v54_s2_jtag:
+  extends: .build_v54_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v54_s2_swd:
+  extends: .build_v54_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "swd"
+
+build_v54_s3_jtag:
+  extends: .build_v54_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v54_s3_swd:
+  extends: .build_v54_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "swd"
+
+##############
+#  IDF v5.3  #
+##############
+
+build_v53_s2_jtag:
+  extends: .build_v53_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v53_s2_swd:
+  extends: .build_v53_template
+  variables:
+    CHIP_NAME: "esp32s2"
+    EUB_DEBUG_IFACE: "swd"
+
+build_v53_s3_jtag:
+  extends: .build_v53_template
+  variables:
+    CHIP_NAME: "esp32s3"
+    EUB_DEBUG_IFACE: "jtag"
+
+build_v53_s3_swd:
+  extends: .build_v53_template
   variables:
     CHIP_NAME: "esp32s3"
     EUB_DEBUG_IFACE: "swd"
