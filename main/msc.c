@@ -327,6 +327,14 @@ static const char *chipid_to_name(const uint32_t id)
         return "ESP32-C6";
     case 0x3d308e94:
         return "ESP32-P4";
+    case 0xf71c0343:
+        return "ESP32-C5";
+    case 0x77d850c4:
+        return "ESP32-C61";
+    case 0xb6dd00af:
+        return "ESP32-H21";
+    case 0x9e0baa8a:
+        return "ESP32-H4";
     default:
         return "unknown";
     }
