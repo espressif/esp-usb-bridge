@@ -44,7 +44,8 @@
 #include "driver/gpio.h"
 #include "esp_io.h"
 
-#define FAT_CLUSTERS                    (6 * 1024)
+#define KB(x) ((x) * 1024)
+#define FAT_CLUSTERS                    KB(6)
 #define FAT_SECTORS_PER_CLUSTER         8
 #define FAT_SECTORS                     (FAT_CLUSTERS * FAT_SECTORS_PER_CLUSTER)
 #define FAT_SECTOR_SIZE                 512
@@ -340,12 +341,13 @@ static const char *chipid_to_name(const uint32_t id)
     }
 }
 
+#define BUFFER_SIZE                         KB(16)
+#define FLASH_BLOCK_SIZE                    KB(4)
+
 #define MSC_FLASH_HIGH_BAUDRATE             230400
 #define MSC_FLASH_DEFAULT_BAUDRATE          115200
 
 static int msc_last_block_written = -1;
-static int msc_chunk_size;
-static int msc_blocks;
 static esp_timer_handle_t reset_timer;
 
 static bool msc_change_baudrate(const uint32_t chip_id, const uint32_t baud)
@@ -356,6 +358,141 @@ static bool msc_change_baudrate(const uint32_t chip_id, const uint32_t baud)
     return (esp_loader_change_baudrate(baud) == ESP_LOADER_SUCCESS) && serial_set_baudrate(baud);
 }
 
+static esp_loader_error_t flash_data(uint32_t addr, uint8_t *data, uint32_t datalen)
+{
+    const uint32_t block_size = KB(4); // Seems like max for ROM flash
+    if (esp_loader_flash_start(addr, datalen, block_size) != ESP_LOADER_SUCCESS) {
+        ESP_LOGE(TAG, "Erasing flash failed at addr %" PRId32 " of length %" PRId32, addr, datalen);
+        return ESP_LOADER_ERROR_FAIL;
+    }
+
+    while (datalen > 0) {
+        uint32_t bytes_to_write = MIN(datalen, block_size);
+        ESP_LOGD(TAG, "Writing flash at addr %" PRId32 " of length %" PRId32, addr, bytes_to_write);
+        if (esp_loader_flash_write(data, bytes_to_write) != ESP_LOADER_SUCCESS) {
+            ESP_LOGE(TAG, "Writing flash failed at addr %" PRId32 " of length %" PRId32, addr, datalen);
+            return ESP_LOADER_ERROR_FAIL;
+        }
+        datalen -= bytes_to_write;
+        data += bytes_to_write;
+        addr += bytes_to_write;
+    }
+    return ESP_LOADER_SUCCESS;
+}
+
+static bool handle_data(uint32_t addr, uint8_t *data, uint32_t datalen, bool flush_buffer)
+{
+    static uint8_t buffer[BUFFER_SIZE];
+    static uint32_t last_written_pos = 0;
+    static uint32_t aligned_addr = 0;
+
+    if (flush_buffer) {
+        // If we have data in buffer, pad it to block boundary and write it
+        if (last_written_pos > 0) {
+            uint32_t end_addr = aligned_addr + last_written_pos;
+            uint32_t pad_size = (FLASH_BLOCK_SIZE - (end_addr % FLASH_BLOCK_SIZE)) % FLASH_BLOCK_SIZE;
+
+            // Read existing data for padding if needed
+            if (pad_size > 0) {
+                if (esp_loader_flash_read(buffer + last_written_pos, end_addr, pad_size) != ESP_LOADER_SUCCESS) {
+                    return false;
+                }
+                last_written_pos += pad_size;
+            }
+
+            // Write the complete block
+            if (flash_data(aligned_addr, buffer, last_written_pos) != ESP_LOADER_SUCCESS) {
+                return false;
+            }
+            last_written_pos = 0;
+        }
+        return true;
+    }
+
+    // If buffer is empty, check if the address is aligned to the block size,
+    // if not, pad the buffer with the existing data from the flash.
+    if (last_written_pos == 0) {
+        aligned_addr = addr & ~(FLASH_BLOCK_SIZE - 1);
+        if (addr != aligned_addr) {
+            uint32_t bytes_to_read = addr - aligned_addr;
+            if (esp_loader_flash_read(buffer, aligned_addr, bytes_to_read) != ESP_LOADER_SUCCESS) {
+                return false;
+            }
+            last_written_pos = bytes_to_read;
+        }
+    }
+
+    // Handle buffer overflow by writing current buffer and continuing with remaining data
+    uint32_t remaining_space = BUFFER_SIZE - last_written_pos;
+    if (datalen > remaining_space) {
+        uint32_t bytes_to_copy = remaining_space;
+        memcpy(buffer + last_written_pos, data, bytes_to_copy);
+
+        if (flash_data(aligned_addr, buffer, BUFFER_SIZE) != ESP_LOADER_SUCCESS) {
+            return false;
+        }
+
+        // Update the remaining data to be written
+        datalen -= bytes_to_copy;
+        data += bytes_to_copy;
+        addr += bytes_to_copy;
+        last_written_pos = 0;
+
+        // Recursively handle remaining data
+        return handle_data(addr, data, datalen, false);
+    }
+
+    // Add new data to buffer
+    memcpy(buffer + last_written_pos, data, datalen);
+    last_written_pos += datalen;
+
+    return true;
+}
+
+static bool init_flash(uint32_t chip_id)
+{
+    serial_set(false);
+
+    if (!serial_set_baudrate(MSC_FLASH_DEFAULT_BAUDRATE)) {
+        ESP_LOGW(TAG, "BRIDGE UART failed to change baudrate to %d", MSC_FLASH_DEFAULT_BAUDRATE);
+        return false;
+    }
+
+    esp_loader_connect_args_t connect_config = ESP_LOADER_CONNECT_DEFAULT();
+    if (esp_loader_connect(&connect_config) != ESP_LOADER_SUCCESS) {
+        ESP_LOGE(TAG, "ESP LOADER connection failed!");
+        return false;
+    }
+    ESP_LOGD(TAG, "ESP LOADER connection success!");
+
+    if (!msc_change_baudrate(chip_id, MSC_FLASH_HIGH_BAUDRATE)) {
+        ESP_LOGE(TAG, "Failed to change baudrate to %d", MSC_FLASH_HIGH_BAUDRATE);
+        return false;
+    }
+    ESP_LOGD(TAG, "Baudrate changed to %d", MSC_FLASH_HIGH_BAUDRATE);
+
+    return true;
+}
+
+static bool finish_flash(void)
+{
+    // Flush any remaining data in the buffer
+    if (!handle_data(0, NULL, 0, true)) {
+        ESP_LOGE(TAG, "Failed to flush buffer");
+        return false;
+    }
+
+    if (!serial_set_baudrate(MSC_FLASH_DEFAULT_BAUDRATE)) {
+        ESP_LOGW(TAG, "ESP LOADER cannot change baudrate to %d", MSC_FLASH_DEFAULT_BAUDRATE);
+    }
+
+    esp_loader_flash_finish(false);
+    serial_set(true);
+    gpio_set_level(GPIO_RST, false);
+    ESP_ERROR_CHECK(esp_timer_start_once(reset_timer, SERIAL_FLASHER_RESET_HOLD_TIME_MS * 1000));
+    return true;
+}
+
 int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t offset, uint8_t *buffer, const uint32_t bufsize)
 {
     ESP_LOGD(TAG, "tud_msc_write10_cb() invoked, lun=%d, lba=%" PRId32 ", offset=%" PRId32, lun, lba, offset);
@@ -363,101 +500,64 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
 
     assert(bufsize == UF2_BLOCK_SIZE);
 
-    // Linux and Windows write files differently. Windows also creates system volume information files on the first
-    // mount. In an ideal case, FAT and ROOT content would be analyzed and the flash file detected.
-    // However, the only reliable way to detect files for flashing is look at the content.
-
     if (esp_timer_is_active(reset_timer)) {
-        ESP_LOGE(TAG, "Cannot flash UF2 block while waiting for the reset timer to finish");
+        ESP_LOGD(TAG, "Waiting for the target to reset");
         return 0;
     }
 
+    // Linux and Windows write files differently. Windows also creates system volume information files on the first
+    // mount. In an ideal case, FAT and ROOT content would be analyzed and the flash file detected.
+    // However, the only reliable way to detect files for flashing is look at the content.
     if (IS_LBA_ELSE(lba)) {
-        const uf2_block_t *p = (uf2_block_t *) buffer;
+        uf2_block_t *p = (uf2_block_t *) buffer;
 
         if (p->magic0 == UF2_FIRST_MAGIC && p->magic1 == UF2_SECOND_MAGIC && p->magic3 == UF2_FINAL_MAGIC) {
             // UF2 block detected
-
             const char *chip_name = (p->flags & UF2_FLAG_FAMILYID_PRESENT) ? chipid_to_name(p->chip_id) : "???";
 
             if (p->flags & UF2_FLAG_MD5_PRESENT) {
                 // TODO check MD5 optionally based on Kconfig option
             }
 
-            ESP_LOGI(TAG, "LBA %" PRId32 ": UF2 block %" PRId32 " of %" PRId32 " for chip %s at %#08" PRIx32 " with length %" PRId32, lba, p->block_no, p->blocks,
+            ESP_LOGD(TAG, "LBA %" PRId32 ": UF2 block %" PRId32 " of %" PRId32 " for chip %s at %#08" PRIx32 " with length %" PRId32, lba, p->block_no, p->blocks,
                      chip_name, p->addr, p->payload_size);
 
-            if (msc_last_block_written + 1 != p->block_no) {
-                ESP_LOGE(TAG, "Trying to write block no. %" PRId32 " but last time %d was written!", p->block_no,
-                         msc_last_block_written);
-                return 0;
+            // Not connected to chip, initialize
+            if (msc_last_block_written == -1) {
+                if (!init_flash(p->chip_id)) {
+                    ESP_LOGE(TAG, "Failed to initialize flash");
+                    eub_abort();
+                }
+            }
+            // The block number is not sequential, flush the buffer
+            else if (p->block_no - 1 != msc_last_block_written) {
+                if (!handle_data(0, NULL, 0, true)) {
+                    ESP_LOGE(TAG, "Failed to flush buffer");
+                    eub_abort();
+                }
             }
 
-            if (p->block_no == 0) {
-                serial_set(false);
-
-                // Set the initial baud rate of the bridge only to match the default target flashing baud rate
-                if (!serial_set_baudrate(MSC_FLASH_DEFAULT_BAUDRATE)) {
-                    ESP_LOGW(TAG, "BRIDGE UART failed to change baudrate to %d", MSC_FLASH_DEFAULT_BAUDRATE);
-                    return 0;
-                }
-
-                esp_loader_connect_args_t connect_config = ESP_LOADER_CONNECT_DEFAULT();
-                if (esp_loader_connect(&connect_config) != ESP_LOADER_SUCCESS) {
-                    ESP_LOGE(TAG, "ESP LOADER connection failed!");
-                    return 0;
-                }
-                ESP_LOGD(TAG, "ESP LOADER connection success!");
-
-                if (!msc_change_baudrate(p->chip_id, MSC_FLASH_HIGH_BAUDRATE)) {
-                    ESP_LOGW(TAG, "ESP LOADER cannot change baudrate to %d", MSC_FLASH_HIGH_BAUDRATE);
-                }
-
-                msc_chunk_size = p->payload_size;
-                msc_blocks = p->blocks;
-                const uint32_t image_size = msc_blocks * msc_chunk_size;
-                if (esp_loader_flash_start(p->addr, image_size, msc_chunk_size) != ESP_LOADER_SUCCESS) {
-                    ESP_LOGE(TAG, "Ereasing flash failed at addr %" PRId32 " of length %" PRId32 " with block size %" PRId32, p->addr,
-                             image_size, p->payload_size);
-                    return 0;
-                }
-                ESP_LOGD(TAG, "ESP LOADER flash start success!");
-            }
-
-            if (p->payload_size > msc_chunk_size) {
-                ESP_LOGE(TAG, "UF2 block %" PRId32 " is of size %" PRId32 " and should be at most %d", p->block_no, p->payload_size,
-                         msc_chunk_size);
+            if (!handle_data(p->addr, p->data, p->payload_size, false)) {
+                ESP_LOGE(TAG, "Failed to handle data");
                 eub_abort();
             }
-
-            if (p->blocks != msc_blocks) {
-                ESP_LOGE(TAG, "UF2 block %" PRId32 " has %" PRId32 " as total block number but it should be %d", p->block_no, p->blocks,
-                         msc_blocks);
-                eub_abort();
-            }
-
-            if (esp_loader_flash_write((void *) p->data, p->payload_size) != ESP_LOADER_SUCCESS) {
-                ESP_LOGE(TAG, "UF2 block %" PRId32 " of %" PRId32 " could not be written at %#08" PRIx32 " with length %" PRId32, p->block_no, p->blocks,
-                         p->addr, p->payload_size);
-                eub_abort();
-            }
-
-            ESP_LOGD(TAG, "ESP LOADER flash write success!");
             msc_last_block_written = p->block_no;
-
-            if (p->block_no == (p->blocks - 1)) {
-                if (!msc_change_baudrate(p->chip_id, MSC_FLASH_DEFAULT_BAUDRATE)) {
-                    ESP_LOGW(TAG, "ESP LOADER cannot change baudrate to %d", MSC_FLASH_DEFAULT_BAUDRATE);
-                }
-                esp_loader_flash_finish(false);
-                gpio_set_level(GPIO_RST, false);
-                ESP_ERROR_CHECK(esp_timer_start_once(reset_timer, SERIAL_FLASHER_RESET_HOLD_TIME_MS * 1000));
-                msc_last_block_written = -1;
-            }
         }
     }
-
     return bufsize;
+}
+
+// Callback invoked when WRITE10 command is completed (status received and accepted by host).
+void tud_msc_write10_complete_cb(uint8_t lun)
+{
+    if (msc_last_block_written != -1) {
+        if (!finish_flash()) {
+            ESP_LOGE(TAG, "Failed to finish flash");
+            eub_abort();
+        }
+        msc_last_block_written = -1;
+    }
+    ESP_LOGD(TAG, "tud_msc_write10_complete_cb() invoked, lun=%" PRIu8, lun);
 }
 
 int32_t tud_msc_scsi_cb(const uint8_t lun, uint8_t const scsi_cmd[16], void *buffer, const uint16_t bufsize)
