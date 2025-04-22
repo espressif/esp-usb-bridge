@@ -25,6 +25,10 @@ extern "C" {
 
 #define CFG_TUD_ENDPOINT0_SIZE      64
 
+// DMA Mode has a priority over Slave/IRQ mode and will be used if hardware supports it
+// Slave/IRQ mode has issue with handling zero length packets
+#define CFG_TUD_DWC2_DMA_ENABLE     1       // Enable DMA
+
 #define CFG_TUD_CDC                 1
 #define CFG_TUD_CDC_RX_BUFSIZE      64
 #define CFG_TUD_CDC_TX_BUFSIZE      64
