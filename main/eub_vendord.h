@@ -20,6 +20,9 @@
 #define EUB_VENDORD_IFACE_STR_IDX   5
 #define EUB_VENDORD_USB_TASK_PRI    4
 
+#define VENDOR_REQUEST_MICROSOFT 0x20  // Can be any value between 0x20 and 0xFF
+#define MS_OS_20_DESC_LEN  0xB2
+
 void eub_vendord_start(void);
 int eub_vendord_send_item(const void *buf, const size_t size);
 void *eub_vendord_recv_acquire_item(size_t *item_size);

@@ -109,41 +109,28 @@ static void esp_usb_jtag_task_resume(void)
     }
 }
 
-/* Control settings are not directly related to the vendor class.
-   e.g; dap protocol also communicates through vendor class but handles settings within the protocol commands.
-   Therefore, we're adding the callback here to keep `eub_vendord.c` isolated and common for swd also.
-*/
-bool tud_vendor_control_xfer_cb(const uint8_t rhport, const uint8_t stage, tusb_control_request_t const *request)
+bool eub_debug_probe_control_handler(const uint8_t rhport, const uint8_t stage, tusb_control_request_t const *request)
 {
-    // nothing to with DATA & ACK stage
-    if (stage != CONTROL_STAGE_SETUP) {
-        return true;
-    }
-
-    switch (request->bmRequestType_bit.type) {
-    case TUSB_REQ_TYPE_VENDOR:
-        ESP_LOGI(TAG, "bRequest: (%d) wValue: (%d) wIndex: (%d)",
-                 request->bRequest, request->wValue, request->wIndex);
-
-        switch (request->bRequest) {
-        case VEND_JTAG_SETDIV:
-        case VEND_JTAG_SETIO:
-            // TODO: process the commands
-            break;
-        case VEND_JTAG_GETTDO: {
-            uint8_t buf = gpio_get_level(GPIO_TDI);
-            return tud_control_xfer(rhport, request, (void *)&buf, 1);
-        }
-        break;
-        case VEND_JTAG_SET_CHIPID:
-            s_target_model = request->wValue;
-        }
-
-        // response with status OK
+    // Function to handle the TUSB_REQ_TYPE_VENDOR control requests from the host,
+    // called by the tusb_control_xfer_cb function in eub_vendord.c.
+    switch (request->bRequest) {
+    case VEND_JTAG_SETDIV:
+    case VEND_JTAG_SETIO:
+        // TODO: process the commands
         return tud_control_status(rhport, request);
+
+    case VEND_JTAG_GETTDO: {
+        uint8_t buf = gpio_get_level(GPIO_TDI);
+        return tud_control_xfer(rhport, request, (void *)&buf, 1);
     }
 
-    return false;
+    case VEND_JTAG_SET_CHIPID:
+        s_target_model = request->wValue;
+        return tud_control_status(rhport, request);
+
+    default:
+        return false;
+    }
 }
 
 inline static void do_jtag_one(const uint8_t tdo_req, const uint8_t tms_tdi_mask)

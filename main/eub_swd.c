@@ -20,6 +20,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 
+#include "tusb.h"
 #include "eub_vendord.h"
 #include "util.h"
 #include "esp_io.h"
@@ -58,6 +59,13 @@ static void eub_swd_task_resume(void)
     if (s_swd_task_handle) {
         vTaskResume(s_swd_task_handle);
     }
+}
+
+bool eub_debug_probe_control_handler(const uint8_t rhport, const uint8_t stage, tusb_control_request_t const *request)
+{
+    // Function to handle the TUSB_REQ_TYPE_VENDOR control requests from the host,
+    // called by the tusb_control_xfer_cb function in eub_vendord.c.
+    return false;
 }
 
 static void swd_task(void *pvParameters)

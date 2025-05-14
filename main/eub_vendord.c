@@ -22,6 +22,8 @@
 #include "esp_timer.h"
 
 #include "eub_vendord.h"
+#include "eub_debug_probe.h"
+#include "usb_defs.h"
 #include "util.h"
 
 static const char *TAG = "eub_vendor";
@@ -86,12 +88,85 @@ static uint16_t eub_vendord_open(uint8_t rhport, tusb_desc_interface_t const *de
     return (uint16_t)((uintptr_t)p_desc - (uintptr_t)desc_intf);
 }
 
-static bool eub_vendord_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const *request)
-{
-    ESP_LOGI(TAG, "%s", __func__);
+static const uint8_t desc_ms_os_20[] = {
+    // Microsoft OS 2.0 Descriptor
+    // Values are taken from https://github.com/hathach/tinyusb/tree/master/examples/device/webusb_serial
+    //
+    // Set header: length, type, windows version, total length
+    // 0x000A = size of the header
+    // MS_OS_20_SET_HEADER_DESCRIPTOR = 0x00 (descriptor type)
+    // 0x06030000 = Windows version 6.3 (Windows 8.1 and later)
+    // MS_OS_20_DESC_LEN = total length of all descriptors
+    U16_TO_U8S_LE(0x000A), U16_TO_U8S_LE(MS_OS_20_SET_HEADER_DESCRIPTOR), U32_TO_U8S_LE(0x06030000), U16_TO_U8S_LE(MS_OS_20_DESC_LEN),
 
-    /* Nothing to do here. `tud_vendor_control_xfer_cb` will take care of the settings. */
-    return true;
+    // Configuration subset header
+    // 0x0008 = size of the header
+    // MS_OS_20_SUBSET_HEADER_CONFIGURATION = 0x01 (descriptor type)
+    // 0 = configuration index (first configuration)
+    // 0 = reserved
+    // MS_OS_20_DESC_LEN - 0x0A = remaining length (total - header length)
+    U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_CONFIGURATION), 0, 0, U16_TO_U8S_LE(MS_OS_20_DESC_LEN - 0x0A),
+
+    // Function Subset header
+    // 0x0008 = size of the header
+    // MS_OS_20_SUBSET_HEADER_FUNCTION = 0x02 (descriptor type)
+    // ITF_NUM_VENDOR = interface number for vendor class
+    // 0 = reserved
+    // MS_OS_20_DESC_LEN - 0x0A - 0x08 = remaining length (total - header - config subset)
+    U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), ITF_NUM_VENDOR, 0, U16_TO_U8S_LE(MS_OS_20_DESC_LEN - 0x0A - 0x08),
+
+    // MS OS 2.0 Compatible ID descriptor
+    // 0x0014 = size of the descriptor
+    // MS_OS_20_FEATURE_COMPATBLE_ID = 0x03 (descriptor type)
+    // 'WINUSB' = compatible ID string
+    // 8 bytes of zeros = sub-compatible ID (not used)
+    U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID), 'W', 'I', 'N', 'U', 'S', 'B', 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // sub-compatible
+
+    // MS OS 2.0 Registry property descriptor
+    // length = remaining bytes (total - all previous sections)
+    // MS_OS_20_FEATURE_REG_PROPERTY = 0x04 (descriptor type)
+    // 0x0007 = REG_MULTI_SZ (property data type)
+    // 0x002A = 42 bytes for property name length ("DeviceInterfaceGUIDs" in UTF-16)
+    U16_TO_U8S_LE(MS_OS_20_DESC_LEN - 0x0A - 0x08 - 0x08 - 0x14), U16_TO_U8S_LE(MS_OS_20_FEATURE_REG_PROPERTY),
+    U16_TO_U8S_LE(0x0007), U16_TO_U8S_LE(0x002A), // wPropertyDataType, wPropertyNameLength and PropertyName "DeviceInterfaceGUIDs\0" in UTF-16
+    'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00, 'e', 0x00, 'I', 0x00, 'n', 0x00, 't', 0x00, 'e', 0x00,
+    'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00, 'e', 0x00, 'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 's', 0x00, 0x00, 0x00,
+    // 0x0050 = 80 bytes for property data length (GUID string in UTF-16)
+    U16_TO_U8S_LE(0x0050), // wPropertyDataLength
+    // Property data: GUID "{80869ad8-c37f-476a-a6b4-ae241c30a473}" in UTF-16 format
+    // Each character is followed by 0x00 for UTF-16 encoding
+    '{', 0x00, '8', 0x00, '0', 0x00, '8', 0x00, '6', 0x00, '9', 0x00, 'a', 0x00, 'd', 0x00, '8', 0x00, '-', 0x00,
+    'c', 0x00, '3', 0x00, '7', 0x00, 'f', 0x00, '-', 0x00, '4', 0x00, '7', 0x00, '6', 0x00, 'a', 0x00, '-', 0x00,
+    'a', 0x00, '6', 0x00, 'b', 0x00, '4', 0x00, '-', 0x00, 'a', 0x00, 'e', 0x00, '2', 0x00, '4', 0x00, '1', 0x00,
+    'c', 0x00, '3', 0x00, '0', 0x00, 'a', 0x00, '4', 0x00, '7', 0x00, '3', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+TU_VERIFY_STATIC(sizeof(desc_ms_os_20) == MS_OS_20_DESC_LEN, "Incorrect size");
+
+bool tud_vendor_control_xfer_cb(const uint8_t rhport, const uint8_t stage, tusb_control_request_t const *request)
+{
+    // nothing to with DATA & ACK stage
+    if (stage != CONTROL_STAGE_SETUP) {
+        return true;
+    }
+
+    switch (request->bmRequestType_bit.type) {
+    case TUSB_REQ_TYPE_VENDOR:
+        ESP_LOGI(TAG, "bRequest: (%d) wValue: (%d) wIndex: (%d)",
+                 request->bRequest, request->wValue, request->wIndex);
+
+        switch (request->bRequest) {
+
+        case VENDOR_REQUEST_MICROSOFT:
+            return tud_control_xfer(rhport, request, (void *)(uintptr_t)desc_ms_os_20, MS_OS_20_DESC_LEN);
+        default:
+            return eub_debug_probe_control_handler(rhport, stage, request);
+        }
+
+    default:
+        return false;
+    }
 }
 
 static bool eub_endpt_transfer(uint8_t rhport, uint8_t ep_addr, uint8_t *buf, uint16_t total_bytes)
@@ -225,7 +300,7 @@ const usbd_class_driver_t s_eub_vendord_driver = {
     .init = eub_vendord_init,
     .reset = eub_vendord_reset,
     .open = eub_vendord_open,
-    .control_xfer_cb = eub_vendord_control_xfer_cb,
+    .control_xfer_cb = tud_vendor_control_xfer_cb,
     .xfer_cb = eub_vendord_xfer_cb,
     .sof = NULL,
 };

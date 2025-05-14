@@ -32,27 +32,16 @@
 #include "esp_private/usb_phy.h"
 #include "eub_vendord.h"
 #include "eub_debug_probe.h"
+#include "usb_defs.h"
 
 static const char *TAG = "bridge_main";
 
-#define EPNUM_CDC       2
-#define EPNUM_VENDOR    3
-#define EPNUM_MSC       4
-
 #define TUSB_DESC_TOTAL_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_VENDOR_DESC_LEN + TUD_MSC_DESC_LEN)
-
-enum {
-    ITF_NUM_CDC = 0,
-    ITF_NUM_CDC_DATA,
-    ITF_NUM_VENDOR,
-    ITF_NUM_MSC,
-    ITF_NUM_TOTAL
-};
 
 static const tusb_desc_device_t descriptor_config = {
     .bLength = sizeof(descriptor_config),
     .bDescriptorType = TUSB_DESC_DEVICE,
-    .bcdUSB = 0x0200,
+    .bcdUSB = 0x0210, // at least 2.1 or 3.x for BOS
     .bDeviceClass = TUSB_CLASS_MISC,
     .bDeviceSubClass = MISC_SUBCLASS_COMMON,
     .bDeviceProtocol = MISC_PROTOCOL_IAD,
@@ -119,7 +108,21 @@ static char const *string_desc_arr[] = {
     /* JTAG_STR_DESC_INX 0x0A */
 };
 
-static uint16_t _desc_str[32];
+#define BOS_TOTAL_LEN      (TUD_BOS_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
+
+// BOS Descriptor with Microsoft OS 2.0 support
+static uint8_t const desc_bos[] = {
+    // total length, number of device caps
+    TUD_BOS_DESCRIPTOR(BOS_TOTAL_LEN, 1),
+
+    // Microsoft OS 2.0 descriptor
+    TUD_BOS_MS_OS_20_DESCRIPTOR(MS_OS_20_DESC_LEN, VENDOR_REQUEST_MICROSOFT)
+};
+
+uint8_t const *tud_descriptor_bos_cb(void)
+{
+    return desc_bos;
+}
 
 uint8_t const *tud_descriptor_configuration_cb(uint8_t index)
 {
@@ -155,6 +158,7 @@ static void init_serial_no(void)
 
 uint16_t const *tud_descriptor_string_cb(const uint8_t index, const uint16_t langid)
 {
+    static uint16_t _desc_str[32];  // Static, because it must exist long enough for transfer to complete
     uint8_t chr_count;
 
     if (index == 0) {

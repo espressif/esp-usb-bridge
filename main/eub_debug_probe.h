@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "tusb.h"
+
 /* Be carefull if you want to change the index. It must be bigger then the size of string_desc_arr
    For now 7 would be also ok. But lets reserve some fields fot the future additions
    Also it must be match with the value in the openocd/esp_usb_bridge.cfg file
@@ -26,3 +28,4 @@ int eub_debug_probe_get_proto_caps(void *dest);
 void eub_debug_probe_task_suspend(void);
 void eub_debug_probe_task_resume(void);
 bool eub_debug_probe_target_is_esp32(void);
+bool eub_debug_probe_control_handler(const uint8_t rhport, const uint8_t stage, tusb_control_request_t const *request);
