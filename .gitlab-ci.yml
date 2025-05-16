@@ -86,5 +86,13 @@ build_matrix:
     matrix:
       - CHIP_NAME: ["esp32s2", "esp32s3"]
         EUB_DEBUG_IFACE: ["jtag", "swd"]
-        IDF_VERSION: ["latest", "release-v5.4", "release-v5.3", "release-v5.2", "release-v5.1", "release-v5.0"]
+        IDF_VERSION: [
+          "release-v5.0",
+          "release-v5.1",
+          "release-v5.2",
+          "release-v5.3",
+          "release-v5.4",
+          "release-v5.5",
+          "latest"
+        ]
   image: espressif/idf:${IDF_VERSION}
