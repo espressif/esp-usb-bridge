@@ -1,21 +1,59 @@
 stages:
-  - pre_check
-  - build_latest
-  - build_v5.4
-  - build_v5.3
-  - build_v5.2
-  - build_v5.1
-  - build_v5.0
+  - pre-check
+  - build
 
 # Global variables
 variables:
-  ESP_IDF_TAG_LATEST: "latest"
-  ESP_IDF_TAG_v50: "release-v5.0"
-  ESP_IDF_TAG_v51: "release-v5.1"
-  ESP_IDF_TAG_v52: "release-v5.2"
-  ESP_IDF_TAG_v53: "release-v5.3"
-  ESP_IDF_TAG_v54: "release-v5.4"
   EUB_APP_NAME: "bridge"
+
+
+# WORKFLOW RULES (global rules for when a pipeline should be triggered or not)
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"' # Run pipeline for merge request events.
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never # Do not run pipeline on push if there are open merge requests for the branch.
+    - if: '$CI_COMMIT_BRANCH' # Run pipeline for any push to the default branch.
+
+##############
+#  PRE CHECK #
+##############
+
+# Shared-CI-DangerJS (CI from external Gitlab repository)
+include:
+  - project: espressif/shared-ci-dangerjs
+    ref: master
+    file: danger.yaml
+run-danger-mr-linter:
+  stage: pre-check
+  tags:
+    - dangerjs
+
+pre_commit:
+  stage: pre-check
+  tags:
+    - build
+  image: python:3.11-bookworm
+  before_script:
+    - apt-get update
+    - apt-get install -y git
+  script:
+    - pip install pre-commit
+    - echo "Merge request is from ${CI_COMMIT_REF_NAME} into ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+    - git fetch origin ${CI_MERGE_REQUEST_TARGET_BRANCH_NAME} ${CI_COMMIT_REF_NAME}
+    - export from_sha=$(git merge-base HEAD origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME})
+    - echo "Checking changes from ${from_sha} to ${CI_COMMIT_SHA}:"
+    - git log --oneline ${from_sha}..${CI_COMMIT_SHA}
+    - echo "Modified files:"
+    - git diff-tree --no-commit-id --name-only -r ${from_sha} ${CI_COMMIT_SHA}
+    - echo "Running pre-commit:"
+    - pre-commit run --from ${from_sha} --to ${CI_COMMIT_SHA}
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+################
+#  BUILD TESTS #
+################
 
 .build_template:
   tags:
@@ -41,216 +79,12 @@ variables:
     - job: pre_commit
       optional: true
 
-.build_latest_template:
-  stage: build_latest
+build_matrix:
   extends: .build_template
-  image: espressif/idf:$ESP_IDF_TAG_LATEST
-
-.build_v54_template:
-  stage: build_v5.4
-  extends: .build_template
-  image: espressif/idf:$ESP_IDF_TAG_v54
-
-.build_v53_template:
-  stage: build_v5.3
-  extends: .build_template
-  image: espressif/idf:$ESP_IDF_TAG_v53
-
-.build_v52_template:
-  stage: build_v5.2
-  extends: .build_template
-  image: espressif/idf:$ESP_IDF_TAG_v52
-
-.build_v51_template:
-  stage: build_v5.1
-  extends: .build_template
-  image: espressif/idf:$ESP_IDF_TAG_v51
-
-.build_v50_template:
-  stage: build_v5.0
-  extends: .build_template
-  image: espressif/idf:$ESP_IDF_TAG_v50
-
-##############
-# IDF master #
-##############
-
-build_latest_s2_jtag:
-  extends: .build_latest_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_latest_s2_swd:
-  extends: .build_latest_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "swd"
-
-build_latest_s3_jtag:
-  extends: .build_latest_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_latest_s3_swd:
-  extends: .build_latest_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "swd"
-
-##############
-#  IDF v5.4  #
-##############
-
-build_v54_s2_jtag:
-  extends: .build_v54_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v54_s2_swd:
-  extends: .build_v54_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "swd"
-
-build_v54_s3_jtag:
-  extends: .build_v54_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v54_s3_swd:
-  extends: .build_v54_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "swd"
-
-##############
-#  IDF v5.3  #
-##############
-
-build_v53_s2_jtag:
-  extends: .build_v53_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v53_s2_swd:
-  extends: .build_v53_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "swd"
-
-build_v53_s3_jtag:
-  extends: .build_v53_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v53_s3_swd:
-  extends: .build_v53_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "swd"
-
-##############
-#  IDF v5.2  #
-##############
-
-build_v52_s2_jtag:
-  extends: .build_v52_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v52_s2_swd:
-  extends: .build_v52_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "swd"
-
-build_v52_s3_jtag:
-  extends: .build_v52_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v52_s3_swd:
-  extends: .build_v52_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "swd"
-
-##############
-#  IDF v5.1  #
-##############
-
-build_v51_s2_jtag:
-  extends: .build_v51_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v51_s2_swd:
-  extends: .build_v51_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "swd"
-
-build_v51_s3_jtag:
-  extends: .build_v51_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v51_s3_swd:
-  extends: .build_v51_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "swd"
-
-##############
-#  IDF v5.0  #
-##############
-
-build_v50_s2_jtag:
-  extends: .build_v50_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v50_s2_swd:
-  extends: .build_v50_template
-  variables:
-    CHIP_NAME: "esp32s2"
-    EUB_DEBUG_IFACE: "swd"
-
-build_v50_s3_jtag:
-  extends: .build_v50_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "jtag"
-
-build_v50_s3_swd:
-  extends: .build_v50_template
-  variables:
-    CHIP_NAME: "esp32s3"
-    EUB_DEBUG_IFACE: "swd"
-
-##############
-#  PRE CHECK #
-##############
-
-pre_commit:
-  stage: pre_check
-  tags:
-    - build
-  image: espressif/idf:$ESP_IDF_TAG_LATEST
-  except:
-    - master
-  script:
-    - pip install pre-commit
-    - pip install wasmtime
-    - git diff-tree --no-commit-id --name-only -r $CI_MERGE_REQUEST_TARGET_BRANCH_NAME -r $CI_COMMIT_SHA | xargs pre-commit run --files
+  stage: build
+  parallel:
+    matrix:
+      - CHIP_NAME: ["esp32s2", "esp32s3"]
+        EUB_DEBUG_IFACE: ["jtag", "swd"]
+        IDF_VERSION: ["latest", "release-v5.4", "release-v5.3", "release-v5.2", "release-v5.1", "release-v5.0"]
+  image: espressif/idf:${IDF_VERSION}
