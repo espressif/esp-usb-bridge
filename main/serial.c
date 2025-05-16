@@ -127,7 +127,7 @@ static void usb_sender_task(void *pvParameters)
                 xSemaphoreGive(usb_tx_requested);
                 const int wr_len = tud_cdc_write(int_buf + transferred, to_send);
                 /* tinyusb might have been flushed the data. In case not flushed, we are flushing here.
-                    2nd atttempt might return zero, meaning there is no data to transfer. So it is safe to call it again.
+                    2nd attempt might return zero, meaning there is no data to transfer. So it is safe to call it again.
                 */
                 tud_cdc_write_flush();
                 if (usb_wait_for_tx(50) != ESP_OK) {

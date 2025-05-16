@@ -8,8 +8,8 @@
 
 #include "tusb.h"
 
-/* Be carefull if you want to change the index. It must be bigger then the size of string_desc_arr
-   For now 7 would be also ok. But lets reserve some fields fot the future additions
+/* Be careful if you want to change the index. It must be bigger then the size of string_desc_arr
+   For now 7 would be also ok. But lets reserve some fields for the future additions
    Also it must be match with the value in the openocd/esp_usb_bridge.cfg file
    Currently it is defined as < esp_usb_jtag_caps_descriptor 0x030A >
 */

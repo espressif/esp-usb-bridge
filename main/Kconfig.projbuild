@@ -96,6 +96,6 @@ menu "Bridge Configuration"
          string "Volume label shown in the MSC disc"
          default "ESPPROG_MSC"
          help
-               Volume label shown in the MSC disc. Max lenght is 11 ASCII characters.
+               Volume label shown in the MSC disc. Max length is 11 ASCII characters.
 
 endmenu

@@ -198,7 +198,7 @@ static bool eub_vendord_xfer_cb(uint8_t rhport, uint8_t ep_addr, xfer_result_t r
 
         // Prepare for next incoming data
         if (!eub_endpt_transfer(rhport, ep_addr, s_eub_vendord_itf.epout_buf, EUB_VENDORD_EPSIZE)) {
-            ESP_LOGE(TAG, "USB tranfer error on EP:%x", ep_addr);
+            ESP_LOGE(TAG, "USB transfer error on EP:%x", ep_addr);
             eub_abort();
         }
 
@@ -220,7 +220,7 @@ static void usb_send_task(void *pvParameters)
         ESP_LOG_BUFFER_HEXDUMP("res", buf, total_bytes, ESP_LOG_DEBUG);
 
         if (!eub_endpt_transfer(s_rhport, s_eub_vendord_itf.ep_in, buf, total_bytes)) {
-            ESP_LOGE(TAG, "USB tranfer error on EP:%x", s_eub_vendord_itf.ep_in);
+            ESP_LOGE(TAG, "USB transfer error on EP:%x", s_eub_vendord_itf.ep_in);
             eub_abort();
         }
 

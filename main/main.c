@@ -226,7 +226,7 @@ static void int_usb_phy(void)
 
 void app_main(void)
 {
-    init_led_gpios(); // Keep this at the begining. LEDs are used for error reporting.
+    init_led_gpios(); // Keep this at the beginning. LEDs are used for error reporting.
 
     init_serial_no();
 

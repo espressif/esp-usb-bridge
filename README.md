@@ -7,6 +7,7 @@ The concept of ESP USB Bridge is shown in the following figure.
 ![ESP USB Bridge concept](images/concept.png)
 
 ESP USB Bridge creates a composite USB device accessible from the PC when they are connected through a USB cable. The main features are the following.
+
 - *Serial bridge*: The developer can run [esptool](https://github.com/espressif/esptool) or connect a terminal program to the serial port provided by the USB CDC. The communication is transferred in both directions between the PC and the target MCU through the ESP USB bridge.
 - *JTAG/SWD bridge*: [openocd-esp32](https://github.com/espressif/openocd-esp32) can be run on the PC which will connect to the ESP USB Bridge. The bridge MCU acts again as bridge between the PC and the MCU, and transfers JTAG/SWD communication between them in both directions.
 - *Mass storage device*: USB Mass storage device is created which can be accessed by a file explorer in the PC. Binaries in UF2 format can be copied to this disk and the bridge MCU will use them to flash the target MCU. Currently ESP USB Bridge is capable of flashing various Espressif microcontrollers.
@@ -36,6 +37,7 @@ Please note that every board should have its own vendor and product identifiers.
 The USB stack of ESP USB Bridge creates a virtual serial port through which the serial port of the target MCU is accessible. For example, this port can be `/dev/ttyACMx` or `COMx` depending on the operating system and is different from the PORT used for flashing the ESP USB Bridge.
 
 For example, an ESP32 target MCU can be flashed and monitored with the following commands.
+
 ```bash
 cd AN_ESP32_PROJECT
 idf.py build
@@ -47,11 +49,13 @@ Please note that [esptool](https://github.com/espressif/esptool) or any terminal
 ## JTAG Bridge
 
 The ESP USB Bridge provides a JTAG device. The following command can be used to connect to an ESP32 target MCU.
+
 ```bash
 idf.py openocd --openocd-commands "-f board/esp32-bridge.cfg"
 ```
 
 [Openocd-esp32](https://github.com/espressif/openocd-esp32) version v0.11.0-esp32-20211220 or newer can be used as well to achieve the same:
+
 ```bash
 openocd -f board/esp32-bridge.cfg
 ```
@@ -59,6 +63,7 @@ openocd -f board/esp32-bridge.cfg
 Please note that the ESP usb bridge protocol has to be selected to communicate with the target MCU. `idf.py openocd` without additional arguments would establish connection with the bridge MCU (if the JTAG pins are connected through a USB-to-JTAG bridge to the PC).
 
 You might want to make your own copy of `esp_usb_bridge.cfg` with the appropriate product and vendor identifiers of your custom hardware:
+
 ```
 adapter driver esp_usb_jtag
 espusbjtag vid_pid 0x303a 0x1002
@@ -74,9 +79,11 @@ The ESP USB Bridge also provides an ARM Serial Wire Debug (SWD) device using the
 On the OpenOCD side, CMSIS-DAP-related updates are continuously synced from the mainline to the Espressif fork. Therefore, it is always recommended to use the latest release or the latest master branch.
 
 The following command can be used to access the SWD port on a target MCU
+
 ```bash
 openocd -s tcl -f interface/cmsis-dap.cfg -f target/<target.cfg>.cfg -c 'adapter speed 5000'
 ```
+
 Make sure to replace `target.cfg` with the actual target config file.
 
 Currently, the ESP USB bridge supports only USB-bulk transfers as a backend. The HID backend is not supported.
@@ -86,6 +93,7 @@ Currently, the ESP USB bridge supports only USB-bulk transfers as a backend. The
 A mass storage device will show up in the PC connected to the ESP USB bridge. This can be accessed as any other USB storage disk. Binaries built in [the UF2 format](https://github.com/microsoft/uf2) can be copied to this disk and the bridge MCU will flash the target MCU accordingly.
 
 Binary `uf2.bin` will be generated and placed into the `AN_ESP32_PROJECT/build` directory by running the following commands.
+
 ```bash
 cd AN_ESP32_PROJECT
 idf.py uf2
@@ -94,7 +102,6 @@ idf.py uf2
 ## License
 
 The code in this project Copyright 2020-2022 Espressif Systems (Shanghai) Co Ltd., and is licensed under the Apache License Version 2.0. The copy of the license can be found in the [LICENSE](LICENSE) file.
-
 
 ## Contributing
 
@@ -105,11 +112,14 @@ Issue reports and feature requests can be submitted using Github Issues: https:/
 Contributions in the form of pull requests should follow ESP-IDF project's [contribution guidelines](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/contribute/index.html).
 
 Additionally please install [pre-commit](https://pre-commit.com/#install) hooks before committing code:
+
 ```bash
 pip install pre-commit
 pre-commit install
 ```
+
 ---
+
 This project is universal and can be used with various hardware setups. For detailed hardware setup requirements, please refer to the [Development Board](#development-board) section. However, if you own an ESP-Prog2, you can use the following link to try to flash it using ESP Launchpad.
 
 <a href="https://espressif.github.io/esp-launchpad/?flashConfigURL=https://espressif.github.io/esp-usb-bridge/launchpad.toml">
