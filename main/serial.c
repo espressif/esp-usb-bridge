@@ -242,7 +242,7 @@ void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
         if (eub_debug_probe_target_is_esp32() && !tdi_bootstrapping && boot && !rst) {
             eub_debug_probe_task_suspend();
             tdi_bootstrapping = true;
-            gpio_set_level(CONFIG_BRIDGE_GPIO_TDO, 0);
+            gpio_set_level(GPIO_TDI, 0);
             ESP_LOGW(TAG, "jtag task suspended");
         }
         if (tdi_bootstrapping && boot && rst) {

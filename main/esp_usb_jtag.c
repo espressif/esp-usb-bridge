@@ -112,7 +112,7 @@ bool eub_debug_probe_control_handler(const uint8_t rhport, const uint8_t stage, 
         return tud_control_status(rhport, request);
 
     case VEND_JTAG_GETTDO: {
-        uint8_t buf = gpio_get_level(GPIO_TDI);
+        uint8_t buf = gpio_get_level(GPIO_TDO);
         return tud_control_xfer(rhport, request, (void *)&buf, 1);
     }
 
