@@ -28,6 +28,8 @@ run-danger-mr-linter:
   stage: pre-check
   tags:
     - dangerjs
+  variables:
+    ENABLE_CHECK_UPDATED_CHANGELOG: 'false'
 
 pre_commit:
   stage: pre-check
