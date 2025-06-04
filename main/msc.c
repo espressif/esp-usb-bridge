@@ -277,6 +277,7 @@ int32_t tud_msc_read10_cb(const uint8_t lun, const uint32_t lba, const uint32_t 
 
 #define UF2_BLOCK_SIZE                  512
 #define UF2_DATA_SIZE                   476
+#define UF2_MD5_SIZE                    24
 #define UF2_FIRST_MAGIC                 0x0A324655
 #define UF2_SECOND_MAGIC                0x9E5D5157
 #define UF2_FINAL_MAGIC                 0x0AB16F30
@@ -507,10 +508,6 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
             // UF2 block detected
             const char *chip_name = (p->flags & UF2_FLAG_FAMILYID_PRESENT) ? chipid_to_name(p->chip_id) : "???";
 
-            if (p->flags & UF2_FLAG_MD5_PRESENT) {
-                // TODO check MD5 optionally based on Kconfig option
-            }
-
             ESP_LOGD(TAG, "LBA %" PRId32 ": UF2 block %" PRId32 " of %" PRId32 " for chip %s at %#08" PRIx32 " with length %" PRId32, lba, p->block_no, p->blocks,
                      chip_name, p->addr, p->payload_size);
 
@@ -529,7 +526,8 @@ int32_t tud_msc_write10_cb(const uint8_t lun, const uint32_t lba, const uint32_t
                 }
             }
 
-            if (!handle_data(p->addr, p->data, p->payload_size, false)) {
+            const uint32_t real_payload_size = (p->flags & UF2_FLAG_MD5_PRESENT) ? (UF2_DATA_SIZE - UF2_MD5_SIZE) : UF2_DATA_SIZE;
+            if (!handle_data(p->addr, p->data, real_payload_size, false)) {
                 ESP_LOGE(TAG, "Failed to handle data");
                 eub_abort();
             }
