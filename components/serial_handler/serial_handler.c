@@ -14,6 +14,7 @@
 
 #include "serial_handler.h"
 #include "esp_log.h"
+#include "esp_check.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -155,6 +156,9 @@ static esp_err_t init_uart_transport(void)
     };
 
     if (loader_port_esp32_init(&serial_conf) == ESP_LOADER_SUCCESS) {
+        // Enable pull up for RXD to avoid floating input
+        ESP_RETURN_ON_ERROR(gpio_pullup_en(GPIO_RXD), TAG, "Failed to enable pull up for RXD");
+
         ESP_LOGI(TAG, "UART have been initialized");
 
         // Start UART event task
