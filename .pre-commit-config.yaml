@@ -41,6 +41,7 @@ repos:
     rev: 0.7.22
     hooks:
       - id: mdformat
+        exclude: CHANGELOG.md
         args: [--number] # Keep numbering for ordered lists
         additional_dependencies:
           - mdformat-gfm # Support for GitHub Flavored Markdown (GFM), including tables, task lists, strikethroughs, and autolinks.
