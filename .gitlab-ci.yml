@@ -95,6 +95,7 @@ build_matrix:
           "release-v5.3",
           "release-v5.4",
           "release-v5.5",
+          "release-v6.0",
           "latest"
         ]
   image: espressif/idf:${IDF_VERSION}
