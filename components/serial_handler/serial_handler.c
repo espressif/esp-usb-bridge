@@ -159,6 +159,16 @@ static esp_err_t init_uart_transport(void)
         // Enable pull up for RXD to avoid floating input
         ESP_RETURN_ON_ERROR(gpio_pullup_en(GPIO_RXD), TAG, "Failed to enable pull up for RXD");
 
+        // Override BOOT/RST pins to open-drain so the bridge never actively drives them HIGH.
+        // The internal pull-ups (and any external pull-ups on the target) define the idle HIGH level,
+        // while other devices can still pull the lines LOW without bus contention.
+        ESP_RETURN_ON_ERROR(gpio_set_direction(GPIO_BOOT, GPIO_MODE_OUTPUT_OD), TAG, "Failed to set boot pin to open-drain");
+        ESP_RETURN_ON_ERROR(gpio_pullup_en(GPIO_BOOT), TAG, "Failed to enable pull up for BOOT");
+        ESP_RETURN_ON_ERROR(gpio_set_level(GPIO_BOOT, 1), TAG, "Failed to release boot pin");
+        ESP_RETURN_ON_ERROR(gpio_set_direction(GPIO_RST, GPIO_MODE_OUTPUT_OD), TAG, "Failed to set reset pin to open-drain");
+        ESP_RETURN_ON_ERROR(gpio_pullup_en(GPIO_RST), TAG, "Failed to enable pull up for RST");
+        ESP_RETURN_ON_ERROR(gpio_set_level(GPIO_RST, 1), TAG, "Failed to release reset pin");
+
         ESP_LOGI(TAG, "UART have been initialized");
 
         // Start UART event task
