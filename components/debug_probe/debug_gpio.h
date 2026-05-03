@@ -9,6 +9,7 @@
 #include <driver/gpio.h>
 #include <driver/dedic_gpio.h>
 #include <hal/dedic_gpio_cpu_ll.h>
+#include "soc/gpio_reg.h"
 #include "hal/gpio_ll.h"
 #include "compiler.h"
 #include "sdkconfig.h"

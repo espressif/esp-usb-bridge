@@ -13,7 +13,6 @@
 #include "msc.h"
 #include "serial_handler.h"
 #include "serial_bridge.h"
-#include "hal/usb_phy_types.h"
 #include "rom/gpio.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
