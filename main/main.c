@@ -132,13 +132,13 @@ void tud_mount_cb(void)
 {
     ESP_LOGI(TAG, "Mounted");
 
-    eub_vendord_start();
-
     esp_err_t debug_result = debug_probe_init();
     if (debug_result != ESP_OK) {
         ESP_LOGW(TAG, "Debug probe initialization failed: %s", esp_err_to_name(debug_result));
         eub_abort();
     }
+
+    eub_vendord_start();
     debug_probe_register_activity_callback(debug_activity_callback);
 }
 
@@ -260,5 +260,6 @@ void app_main(void)
     tusb_init();
     msc_init();
 
-    xTaskCreate(tusb_device_task, "tusb_device_task", 4 * 1024, NULL, 5, NULL);
+    // dedic_gpio bundles are CPU-local; task must run on the same core that created them
+    xTaskCreatePinnedToCore(tusb_device_task, "tusb_device_task", 4 * 1024, NULL, 5, NULL, esp_cpu_get_core_id());
 }
