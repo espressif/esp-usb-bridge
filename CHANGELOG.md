@@ -1,3 +1,20 @@
+## v1.2.1 (2026-06-15)
+
+### 🐛 Bug Fixes
+
+- **main**: pin tusb_device_task to CPU0 for dedicated GPIO correctness *(Jaroslav Burian - 7933745)*
+- **build**: support updated ESP-IDF header layout *(Jaroslav Burian - c82c088)*
+- **serial_handler**: let external tools control shared boot and reset lines *(AvNavSim - 7534bb5)*
+
+### 📖 Documentation
+
+- move ESP Launchpad link to top of page *(Jaroslav Burian - 94d5825)*
+
+### 🔧 Code Refactoring
+
+- Update driver dependency *(Jaroslav Safka - 01e97f2)*
+
+
 ## v1.2.0 (2025-09-23)
 
 ### ✨ New Features
