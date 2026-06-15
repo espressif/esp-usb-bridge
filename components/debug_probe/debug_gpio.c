@@ -106,7 +106,7 @@ void debug_probe_init_swd_pins(void)
             .gpio_array = bundle_io_gpios,
             .array_size = ARRAY_SIZE(bundle_io_gpios),
             .flags = {
-                .out_en = 1,
+                .out_en = 0, /* We will output without dedic_gpio, or we cannot disable output */
                 .in_en = 1,
             },
         };
