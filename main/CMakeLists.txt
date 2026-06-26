@@ -11,6 +11,7 @@ idf_component_register(SRCS "main.c"
                             "msc.c"
                             "eub_vendord.c"
                             "serial_bridge.c"
+                            "usb_phy.c"
                        REQUIRES ${dependencies}
                        LDFRAGMENTS "noflash.lf"
                        INCLUDE_DIRS "." "public_include")

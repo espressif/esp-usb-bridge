@@ -52,6 +52,32 @@ idf.py -p /dev/ttyACMx flash monitor
 
 Please note that [esptool](https://github.com/espressif/esptool) or any terminal program can connect to the virtual serial port as well.
 
+### Updating Bridge Firmware (Magic Baud Download Mode)
+
+The bridge chip (ESP32-S2 or ESP32-S3) can reset **itself** into ROM download mode when the host sets the USB CDC port to a configured magic baud rate and then closes the port. This allows updating EUB firmware over the same USB cable without physical BOOT/RESET access.
+
+The magic baud **arms** the reset; clearing DTR on port close **fires** it. The bridge then sets `RTC_CNTL_FORCE_DOWNLOAD_BOOT` and restarts. The ROM bootloader exposes a USB download interface on the same cable. This affects the **bridge MCU only**. While the bridge application is running, DTR/RTS on this port still drive the target's BOOT and RST lines; they are unrelated to this self-reset path except that clearing DTR is what fires it once armed.
+
+Do **not** use the magic baud for normal target serial traffic. Opening the CDC at that rate and then clearing DTR (port close, or a host reset sequence that deasserts DTR) puts the **bridge** into download mode instead of communicating with the target.
+
+Configure the magic baud in menuconfig under **Bridge Configuration** (`CONFIG_BRIDGE_DOWNLOAD_MAGIC_BAUD`, default `1200`). Set to `0` to disable. Prefer a baud that host tools will not use for the target. Rebuild and flash after changing the value. The host `bit_rate` must match exactly.
+
+To trigger download mode from the host, adjust `PORT` and baud if configured differently.
+DTR must be asserted while the magic baud is set, then cleared to fire the reset.
+`pyserial` asserts DTR on open by default, so closing the port is enough:
+
+```bash
+python3 -c "import serial; s=serial.Serial('PORT', 1200); s.close()"
+```
+
+After the bridge reboots, flash over USB:
+
+```bash
+idf.py -p PORT flash
+```
+
+The feature requires `EFUSE_DIS_FORCE_DOWNLOAD` and `EFUSE_DIS_DOWNLOAD_MODE` not to be burned (default on development chips).
+
 ## JTAG Bridge
 
 The ESP USB Bridge provides a JTAG device. The following command can be used to connect to an ESP32 target MCU.

@@ -69,4 +69,16 @@ menu "Bridge Configuration"
         help
             Volume label shown in the MSC disc. Max length is 11 ASCII characters.
 
+    config BRIDGE_DOWNLOAD_MAGIC_BAUD
+        int "Magic baud rate to enter download mode"
+        default 1200
+        help
+            When the host sets the CDC serial port to this baud rate, download
+            mode reset is armed. Closing the port (clearing DTR) then resets the
+            bridge chip (ESP32-S2 or ESP32-S3) into download mode so its firmware
+            can be updated over USB. Do not use this baud for normal target
+            serial traffic; any DTR clear while armed triggers bridge download
+            mode. Prefer a baud that host tools will not use for the target.
+            Set to 0 to disable.
+
 endmenu

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2020-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -18,10 +18,16 @@
 #include "freertos/ringbuf.h"
 #include "freertos/semphr.h"
 #include "esp_timer.h"
+#include "esp_system.h"
+#include "sdkconfig.h"
 #include "util.h"
 #include "debug_probe.h"
+#include "usb_phy.h"
+#include "soc/rtc_cntl_reg.h"
 
 #define USB_SEND_RINGBUFFER_SIZE (2 * 1024)
+/* tud_cdc_n_get_line_state(): bit 0 = DTR, bit 1 = RTS */
+#define CDC_LINE_STATE_DTR (1u << 0)
 
 static const char *TAG = "serial_bridge";
 
@@ -29,6 +35,7 @@ static RingbufHandle_t usb_sendbuf;
 static SemaphoreHandle_t usb_tx_requested = NULL;
 static SemaphoreHandle_t usb_tx_done = NULL;
 static esp_timer_handle_t state_change_timer;
+static bool download_mode_armed;
 
 // Transport data received callback - called by serial handler when data arrives
 static void transport_data_received_callback(const uint8_t *data, size_t len)
@@ -121,8 +128,22 @@ void tud_cdc_rx_cb(const uint8_t itf)
     }
 }
 
+static void enter_download_mode(void);
+
 void tud_cdc_line_coding_cb(const uint8_t itf, cdc_line_coding_t const *p_line_coding)
 {
+    if (CONFIG_BRIDGE_DOWNLOAD_MAGIC_BAUD > 0 && p_line_coding->bit_rate == CONFIG_BRIDGE_DOWNLOAD_MAGIC_BAUD) {
+        ESP_LOGI(TAG, "Magic baud %" PRIu32 " detected, arming download mode reset",
+                 p_line_coding->bit_rate);
+        download_mode_armed = true;
+        // Fire immediately if the host already cleared DTR (e.g. baud change on a closed port).
+        if (!(tud_cdc_n_get_line_state(itf) & CDC_LINE_STATE_DTR)) {
+            enter_download_mode();
+        }
+        return;
+    }
+
+    download_mode_armed = false;
     if (serial_handler_set_baudrate(p_line_coding->bit_rate) != ESP_OK) {
         ESP_LOGE(TAG, "Could not set the baudrate to %" PRIu32, p_line_coding->bit_rate);
         eub_abort();
@@ -131,6 +152,12 @@ void tud_cdc_line_coding_cb(const uint8_t itf, cdc_line_coding_t const *p_line_c
 
 void tud_cdc_line_state_cb(const uint8_t itf, const bool dtr, const bool rts)
 {
+    // Magic baud arms download mode; clearing DTR (typically on port close) fires it.
+    if (download_mode_armed && !dtr) {
+        enter_download_mode();
+        return;
+    }
+
     // The following transformation of DTR & RTS signals to BOOT & RST is done based on auto reset circutry shown in
     // schematics of ESP boards.
 
@@ -180,6 +207,20 @@ static void state_change_timer_cb(void *arg)
 {
     ESP_LOGI(TAG, "BOOT = 1, RST = 1");
     serial_handler_set_boot_reset_pins(true, true); // BOOT=1, RST=1 (not in reset)
+}
+
+static void enter_download_mode(void)
+{
+    if (CONFIG_BRIDGE_DOWNLOAD_MAGIC_BAUD <= 0) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Forcing download mode and resetting bridge chip");
+    // Tear down USB before restart; avoid logging after this point (PHY/console go away).
+    // Called from tusb_device_task (CDC callbacks); esp_restart() never returns to tud_task.
+    eub_usb_phy_deinit();
+    REG_SET_BIT(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+    esp_restart();
 }
 
 static void init_state_change_timer(void)

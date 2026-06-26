@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2020-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -17,10 +17,10 @@
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "esp_mac.h"
-#include "esp_private/usb_phy.h"
 #include "eub_vendord.h"
 #include "debug_probe.h"
 #include "usb_defs.h"
+#include "usb_phy.h"
 #include "led_io.h"
 
 static const char *TAG = "bridge_main";
@@ -229,27 +229,13 @@ static void init_led_gpios(void)
     ESP_LOGI(TAG, "LED GPIO init done");
 }
 
-static void int_usb_phy(void)
-{
-    usb_phy_config_t phy_config = {
-        .controller = USB_PHY_CTRL_OTG,
-        .target = USB_PHY_TARGET_INT,
-        .otg_mode = USB_OTG_MODE_DEVICE,
-        .otg_speed = USB_PHY_SPEED_FULL,
-        .ext_io_conf = NULL,
-        .otg_io_conf = NULL,
-    };
-    usb_phy_handle_t phy_handle;
-    usb_new_phy(&phy_config, &phy_handle);
-}
-
 void app_main(void)
 {
     init_led_gpios(); // Keep this at the beginning. LEDs are used for error reporting.
 
     init_serial_no();
 
-    int_usb_phy();
+    ESP_ERROR_CHECK(eub_usb_phy_init());
 
     ESP_ERROR_CHECK(serial_handler_init(TRANSPORT_TYPE_UART));
     serial_handler_register_tx_activity_callback(serial_tx_activity_callback);
