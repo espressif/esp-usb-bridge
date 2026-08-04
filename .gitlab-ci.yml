@@ -1,6 +1,7 @@
 stages:
   - pre-check
   - build
+  - target-test
 
 # Global variables
 variables:
@@ -61,12 +62,19 @@ pre_commit:
   tags:
     - build
   script:
-    - PEDANTIC_FLAGS="-DIDF_CI_BUILD -Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
-    - export PEDANTIC_CFLAGS="${PEDANTIC_FLAGS} -Wstrict-prototypes"
-    - export PEDANTIC_CXXFLAGS="${PEDANTIC_FLAGS}"
-    - idf.py -DIDF_TARGET=${CHIP_NAME} -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.${EUB_DEBUG_IFACE}.defaults" build
-    - cd build
-    - esptool.py --chip ${CHIP_NAME} merge_bin -o ${EUB_APP_NAME}_merged.bin @flash_args
+    - |
+      PEDANTIC_FLAGS="-DIDF_CI_BUILD -Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
+      export PEDANTIC_CFLAGS="${PEDANTIC_FLAGS} -Wstrict-prototypes"
+      export PEDANTIC_CXXFLAGS="${PEDANTIC_FLAGS}"
+      if [ "${CHIP_NAME}" = "esp32s3" ]; then
+        SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp_prog2;sdkconfig.defaults.esp32s3;sdkconfig.${EUB_DEBUG_IFACE}.defaults"
+      else
+        SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.${EUB_DEBUG_IFACE}.defaults"
+      fi
+      echo "SDKCONFIG_DEFAULTS=${SDKCONFIG_DEFAULTS}"
+      idf.py -DIDF_TARGET=${CHIP_NAME} -DSDKCONFIG_DEFAULTS="${SDKCONFIG_DEFAULTS}" build
+      cd build
+      esptool.py --chip ${CHIP_NAME} merge_bin -o ${EUB_APP_NAME}_merged.bin @flash_args
   artifacts:
     paths:
       - build/flasher_args.json
@@ -99,3 +107,84 @@ build_matrix:
           "latest"
         ]
   image: espressif/idf:${IDF_VERSION}
+
+#################
+#  TARGET TEST  #
+#################
+
+.target_test_template:
+  stage: target-test
+  before_script:
+    - pip install -r test/requirements.txt
+    - ls -la /dev/serial_ports/ || true
+  script:
+    - pytest "${EUB_TEST_FILE}" -vv -s --port "${EUB_PORT}" --junitxml="${EUB_JUNIT_XML}"
+  artifacts:
+    when: always
+    reports:
+      junit: $EUB_JUNIT_XML
+    paths:
+      - test/report_*.xml
+    expire_in: 1 week
+
+.target_test_openocd:
+  extends: .target_test_template
+  # ESP-IDF image provides openocd-esp32 plus interface/target scripts.
+  image: espressif/idf:latest
+  before_script:
+    - . "${IDF_PATH}/export.sh"
+    - pip install -r test/requirements.txt
+    - command -v openocd
+    - ls -la /dev/serial_ports/ || true
+
+target_test_uart:
+  extends: .target_test_template
+  image: python:3.13-slim
+  tags:
+    - eub_uart
+  script:
+    - pytest "${EUB_TEST_FILE}" -vv -s --port "${EUB_PORT}" --uf2-device "${EUB_UF2_DEVICE}" --junitxml="${EUB_JUNIT_XML}"
+  needs:
+    - job: build_matrix
+      parallel:
+        matrix:
+          - CHIP_NAME: esp32s3
+            EUB_DEBUG_IFACE: jtag
+            IDF_VERSION: latest
+  variables:
+    EUB_PORT: "/dev/serial_ports/prog2_uart"
+    EUB_UF2_DEVICE: "/dev/serial_ports/prog2_uart_msc"
+    EUB_TEST_FILE: "test/test_target_uart.py"
+    EUB_JUNIT_XML: "test/report_uart.xml"
+
+target_test_jtag:
+  extends: .target_test_openocd
+  tags:
+    - eub_jtag
+  needs:
+    - job: build_matrix
+      parallel:
+        matrix:
+          - CHIP_NAME: esp32s3
+            EUB_DEBUG_IFACE: jtag
+            IDF_VERSION: latest
+  variables:
+    EUB_PORT: "/dev/serial_ports/prog2_jtag"
+    EUB_TEST_FILE: "test/test_target_jtag.py"
+    EUB_JUNIT_XML: "test/report_jtag.xml"
+
+target_test_swd:
+  extends: .target_test_openocd
+  tags:
+    - eub_swd
+  needs:
+    - job: build_matrix
+      parallel:
+        matrix:
+          - CHIP_NAME: esp32s3
+            EUB_DEBUG_IFACE: swd
+            IDF_VERSION: latest
+  variables:
+    EUB_PORT: "/dev/serial_ports/prog2_swd"
+    EUB_TEST_FILE: "test/test_target_swd.py"
+    EUB_JUNIT_XML: "test/report_swd.xml"
