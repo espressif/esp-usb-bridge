@@ -125,7 +125,9 @@ uint8_t const *tud_descriptor_device_cb(void)
 
 static void debug_activity_callback(bool active)
 {
+#if (LED_JTAG > -1)
     gpio_set_level(LED_JTAG, active ? LED_JTAG_ON : LED_JTAG_OFF);
+#endif
 }
 
 void tud_mount_cb(void)
@@ -203,28 +205,47 @@ static void tusb_device_task(void *pvParameters)
 // LEDs TX and RX are swapped in the code to indicate activity from the bridge to the target
 static void serial_tx_activity_callback(bool active)
 {
+#if (LED_RX > -1)
     gpio_set_level(LED_RX, active ? LED_RX_ON : LED_RX_OFF);
+#endif
 }
 
 static void serial_rx_activity_callback(bool active)
 {
+#if (LED_TX > -1)
     gpio_set_level(LED_TX, active ? LED_TX_ON : LED_TX_OFF);
+#endif
 }
 
 static void init_led_gpios(void)
 {
-    gpio_config_t io_conf = {};
+    gpio_config_t io_conf = { 0 };
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL << CONFIG_BRIDGE_GPIO_LED1) | (1ULL << CONFIG_BRIDGE_GPIO_LED2) |
-                           (1ULL << CONFIG_BRIDGE_GPIO_LED3);
+#if (CONFIG_BRIDGE_GPIO_LED1 > -1)
+    io_conf.pin_bit_mask |= 1ULL << CONFIG_BRIDGE_GPIO_LED1;
+#endif
+#if (CONFIG_BRIDGE_GPIO_LED2 > -1)
+    io_conf.pin_bit_mask |= 1ULL << CONFIG_BRIDGE_GPIO_LED2;
+#endif
+#if (CONFIG_BRIDGE_GPIO_LED3 > -1)
+    io_conf.pin_bit_mask |= 1ULL << CONFIG_BRIDGE_GPIO_LED3;
+#endif
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
-    ESP_ERROR_CHECK(gpio_config(&io_conf));
+    if (io_conf.pin_bit_mask) {
+        ESP_ERROR_CHECK(gpio_config(&io_conf));
+    }
 
+#if (CONFIG_BRIDGE_GPIO_LED1 > -1)
     gpio_set_level(CONFIG_BRIDGE_GPIO_LED1, !CONFIG_BRIDGE_GPIO_LED1_ACTIVE);
+#endif
+#if (CONFIG_BRIDGE_GPIO_LED2 > -1)
     gpio_set_level(CONFIG_BRIDGE_GPIO_LED2, !CONFIG_BRIDGE_GPIO_LED2_ACTIVE);
+#endif
+#if (CONFIG_BRIDGE_GPIO_LED3 > -1)
     gpio_set_level(CONFIG_BRIDGE_GPIO_LED3, !CONFIG_BRIDGE_GPIO_LED3_ACTIVE);
+#endif
 
     ESP_LOGI(TAG, "LED GPIO init done");
 }
