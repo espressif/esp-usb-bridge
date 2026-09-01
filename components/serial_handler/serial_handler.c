@@ -155,6 +155,12 @@ static esp_err_t init_uart_transport(void)
         .gpio0_trigger_pin = GPIO_BOOT,
     };
 
+    // Pre-set the BOOT/RST output registers high before loader_port_esp32_init()
+    // switches the pins to outputs, so the target is not glitched into reset or
+    // download mode on every bridge power-up.
+    gpio_set_level(GPIO_BOOT, 1);
+    gpio_set_level(GPIO_RST, 1);
+
     if (loader_port_esp32_init(&serial_conf) == ESP_LOADER_SUCCESS) {
         // Enable pull up for RXD to avoid floating input
         ESP_RETURN_ON_ERROR(gpio_pullup_en(GPIO_RXD), TAG, "Failed to enable pull up for RXD");
