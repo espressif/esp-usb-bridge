@@ -10,6 +10,8 @@ from flash_helpers import run_esptool, wait_for_port
 
 
 TARGET_CHIP = 'esp32c3'
+HIGH_BAUD = 921600
+HIGH_BAUD_READ_SIZE = 0x20000
 UF2_TEST_OFFSET = 0x100000
 UF2_TEST_DATA_SIZE = 256
 UF2_BLOCK_SIZE = 512
@@ -49,6 +51,24 @@ def test_uart_flash_and_chip_id(eub_port: str) -> None:
     """chip_id the ESP32-C3 through a session-flashed UART bridge."""
     output = target_chip_id(eub_port)
     assert 'ESP32-C3' in output, f'Unexpected chip_id output:\n{output}'
+
+
+def test_uart_high_baud_read_flash(eub_port: str, tmp_path: Path) -> None:
+    """Read a sustained target-to-host stream at 921600 baud."""
+    readback_bin = tmp_path / 'high_baud_readback.bin'
+    run_esptool(
+        '--chip',
+        TARGET_CHIP,
+        '-p',
+        eub_port,
+        '-b',
+        str(HIGH_BAUD),
+        'read-flash',
+        '0x0',
+        hex(HIGH_BAUD_READ_SIZE),
+        str(readback_bin),
+    )
+    assert readback_bin.stat().st_size == HIGH_BAUD_READ_SIZE
 
 
 def test_uart_uf2_flash(eub_port: str, uf2_device: Path, tmp_path: Path) -> None:
