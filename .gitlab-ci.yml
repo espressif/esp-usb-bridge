@@ -62,28 +62,46 @@ pre_commit:
   tags:
     - build
   script:
+    - pip install -U idf-build-apps --prefer-binary
     - |
       PEDANTIC_FLAGS="-DIDF_CI_BUILD -Werror -Werror=deprecated-declarations -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
       export PEDANTIC_CFLAGS="${PEDANTIC_FLAGS} -Wstrict-prototypes"
       export PEDANTIC_CXXFLAGS="${PEDANTIC_FLAGS}"
-      if [ "${CHIP_NAME}" = "esp32s3" ]; then
-        SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp_prog2;sdkconfig.defaults.esp32s3;sdkconfig.${EUB_DEBUG_IFACE}.defaults"
-      else
-        SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.${EUB_DEBUG_IFACE}.defaults"
-      fi
-      echo "SDKCONFIG_DEFAULTS=${SDKCONFIG_DEFAULTS}"
-      idf.py -DIDF_TARGET=${CHIP_NAME} -DSDKCONFIG_DEFAULTS="${SDKCONFIG_DEFAULTS}" build
-      cd build
-      esptool.py --chip ${CHIP_NAME} merge_bin -o ${EUB_APP_NAME}_merged.bin @flash_args
+      # sdkconfig.defaults.esp_prog2 applies to esp32s3 only. --sdkconfig-defaults
+      # is shared by every app in one invocation, so the chips are built separately.
+      status=0
+      python -m idf_build_apps build -v -p . --target esp32s2 --keep-going \
+        --config-rules "sdkconfig.*.defaults=" \
+        --build-dir "build/@t_@w" || status=1
+      python -m idf_build_apps build -v -p . --target esp32s3 --keep-going \
+        --sdkconfig-defaults "sdkconfig.defaults;sdkconfig.defaults.esp_prog2" \
+        --config-rules "sdkconfig.*.defaults=" \
+        --build-dir "build/@t_@w" || status=1
+      for BUILD_DIR in build/*_*; do
+        [ -f "${BUILD_DIR}/flash_args" ] || continue
+        CHIP_NAME="${BUILD_DIR##*/}"
+        CHIP_NAME="${CHIP_NAME%%_*}"
+        echo "===== Merging ${BUILD_DIR} ====="
+        if ! (
+          cd "${BUILD_DIR}"
+          esptool.py --chip "${CHIP_NAME}" merge_bin -o "${EUB_APP_NAME}_merged.bin" @flash_args
+        ); then
+          echo "FAILED: ${BUILD_DIR} merge_bin"
+          status=1
+        fi
+      done
+      exit "${status}"
   artifacts:
+    # Upload partial results so target tests can still flash a combination that built.
+    when: always
     paths:
-      - build/flasher_args.json
-      - build/${EUB_APP_NAME}.elf
-      - build/${EUB_APP_NAME}.bin
-      - build/bootloader/bootloader.bin
-      - build/bootloader/bootloader.elf
-      - build/partition_table/partition-table.bin
-      - build/${EUB_APP_NAME}_merged.bin
+      - build/*/flasher_args.json
+      - build/*/${EUB_APP_NAME}.elf
+      - build/*/${EUB_APP_NAME}.bin
+      - build/*/bootloader/bootloader.bin
+      - build/*/bootloader/bootloader.elf
+      - build/*/partition_table/partition-table.bin
+      - build/*/${EUB_APP_NAME}_merged.bin
     expire_in: 2 weeks
   needs:
     - job: pre_commit
@@ -94,9 +112,7 @@ build_matrix:
   stage: build
   parallel:
     matrix:
-      - CHIP_NAME: ["esp32s2", "esp32s3"]
-        EUB_DEBUG_IFACE: ["jtag", "swd"]
-        IDF_VERSION: [
+      - IDF_VERSION: [
           "release-v5.0",
           "release-v5.1",
           "release-v5.2",
@@ -114,9 +130,14 @@ build_matrix:
 
 .target_test_template:
   stage: target-test
+  # The latest image builds every combination. Run these tests when one of the
+  # others failed, as long as the firmware this job flashes was uploaded.
+  when: always
+  variables:
+    EUB_MERGED_BIN: build/esp32s3_jtag/bridge_merged.bin
   before_script:
+    - cp "${EUB_MERGED_BIN}" build/bridge_merged.bin
     - pip install -r test/requirements.txt
-    - ls -la /dev/serial_ports/ || true
   script:
     - pytest "${EUB_TEST_FILE}" -vv -s --port "${EUB_PORT}" --junitxml="${EUB_JUNIT_XML}"
   artifacts:
@@ -133,9 +154,8 @@ build_matrix:
   image: espressif/idf:latest
   before_script:
     - . "${IDF_PATH}/export.sh"
+    - cp "${EUB_MERGED_BIN}" build/bridge_merged.bin
     - pip install -r test/requirements.txt
-    - command -v openocd
-    - ls -la /dev/serial_ports/ || true
 
 target_test_uart:
   extends: .target_test_template
@@ -148,9 +168,7 @@ target_test_uart:
     - job: build_matrix
       parallel:
         matrix:
-          - CHIP_NAME: esp32s3
-            EUB_DEBUG_IFACE: jtag
-            IDF_VERSION: latest
+          - IDF_VERSION: latest
   variables:
     EUB_PORT: "/dev/serial_ports/prog2_uart"
     EUB_UF2_DEVICE: "/dev/serial_ports/prog2_uart_msc"
@@ -165,9 +183,7 @@ target_test_jtag:
     - job: build_matrix
       parallel:
         matrix:
-          - CHIP_NAME: esp32s3
-            EUB_DEBUG_IFACE: jtag
-            IDF_VERSION: latest
+          - IDF_VERSION: latest
   variables:
     EUB_PORT: "/dev/serial_ports/prog2_jtag"
     EUB_TEST_FILE: "test/test_target_jtag.py"
@@ -181,10 +197,9 @@ target_test_swd:
     - job: build_matrix
       parallel:
         matrix:
-          - CHIP_NAME: esp32s3
-            EUB_DEBUG_IFACE: swd
-            IDF_VERSION: latest
+          - IDF_VERSION: latest
   variables:
+    EUB_MERGED_BIN: build/esp32s3_swd/bridge_merged.bin
     EUB_PORT: "/dev/serial_ports/prog2_swd"
     EUB_TEST_FILE: "test/test_target_swd.py"
     EUB_JUNIT_XML: "test/report_swd.xml"
