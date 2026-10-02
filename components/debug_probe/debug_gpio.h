@@ -104,12 +104,12 @@ void debug_probe_notify_activity(bool active);
 
 __STATIC_FORCEINLINE void debug_probe_swdio_out_enable(void)
 {
-    REG_WRITE(GPIO_FUNC0_OUT_SEL_CFG_REG + (GPIO_SWDIO * 4), dedic_gpio_conf);
     gpio_ll_output_enable(dedic_gpio_dev, GPIO_SWDIO);
 }
 
 __STATIC_FORCEINLINE void debug_probe_swdio_out_disable(void)
 {
+    REG_WRITE(GPIO_FUNC0_OUT_SEL_CFG_REG + (GPIO_SWDIO * 4), dedic_gpio_conf);
     gpio_ll_output_disable(dedic_gpio_dev, GPIO_SWDIO);
 }
 
@@ -130,17 +130,17 @@ __STATIC_FORCEINLINE void debug_probe_swclk_clr(void)
 
 __STATIC_FORCEINLINE void debug_probe_swdio_set(void)
 {
-    dedic_gpio_cpu_ll_write_mask(GPIO_SWDIO_OUT_MASK, GPIO_SWDIO_OUT_MASK);
+    gpio_ll_set_level(dedic_gpio_dev, GPIO_SWDIO, 1);
 }
 
 __STATIC_FORCEINLINE void debug_probe_swdio_clr(void)
 {
-    dedic_gpio_cpu_ll_write_mask(GPIO_SWDIO_OUT_MASK, 0);
+    gpio_ll_set_level(dedic_gpio_dev, GPIO_SWDIO, 0);
 }
 
 __STATIC_FORCEINLINE void debug_probe_swdio_write(int val)
 {
-    dedic_gpio_cpu_ll_write_mask(GPIO_SWDIO_OUT_MASK, (val & 0x01) ? GPIO_SWDIO_OUT_MASK : 0);
+    gpio_ll_set_level(dedic_gpio_dev, GPIO_SWDIO, (val & 0x1) ? 1 : 0);
 }
 
 __STATIC_FORCEINLINE void debug_probe_swd_blink(int on)
