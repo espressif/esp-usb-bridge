@@ -28,7 +28,7 @@
 #define KB(x) ((x) * 1024)
 
 #define SLAVE_UART_NUM          UART_NUM_1
-#define SLAVE_UART_BUF_SIZE     KB(2)
+#define SLAVE_UART_BUF_SIZE     KB(4)
 #define SLAVE_UART_DEFAULT_BAUD 115200
 #define GPIO_BOOT CONFIG_SERIAL_HANDLER_GPIO_BOOT
 #define GPIO_RST CONFIG_SERIAL_HANDLER_GPIO_RST
@@ -135,7 +135,6 @@ static void uart_event_task(void *pvParameters)
             }
             taskYIELD();
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
     vTaskDelete(NULL);
 }
@@ -147,7 +146,7 @@ static esp_err_t init_uart_transport(void)
         .uart_port = SLAVE_UART_NUM,
         .uart_rx_pin = GPIO_RXD,
         .uart_tx_pin = GPIO_TXD,
-        .rx_buffer_size = SLAVE_UART_BUF_SIZE * 2,
+        .rx_buffer_size = SLAVE_UART_BUF_SIZE * 4,
         .tx_buffer_size = 0,
         .uart_queue = &s_transport.uart_queue,
         .queue_size = 20,
@@ -172,7 +171,7 @@ static esp_err_t init_uart_transport(void)
         ESP_LOGI(TAG, "UART have been initialized");
 
         // Start UART event task
-        xTaskCreate(uart_event_task, "uart_task", KB(8), NULL, SERIAL_HANDLER_TASK_PRI, NULL);
+        xTaskCreate(uart_event_task, "uart_task", KB(12), NULL, SERIAL_HANDLER_TASK_PRI, NULL);
 
         return ESP_OK;
     } else {
