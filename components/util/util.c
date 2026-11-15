@@ -25,9 +25,15 @@ void __attribute__((noreturn)) eub_abort(void)
     };
 
     for (int i = 0; i < sizeof(led_patterns) / sizeof(led_patterns[0]); ++i) {
+#if (LED_TX > -1)
         gpio_set_level(LED_TX, led_patterns[i][0]);
+#endif
+#if (LED_RX > -1)
         gpio_set_level(LED_RX, led_patterns[i][1]);
+#endif
+#if (LED_JTAG > -1)
         gpio_set_level(LED_JTAG, led_patterns[i][2]);
+#endif
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 
