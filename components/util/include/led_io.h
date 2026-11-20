@@ -1,21 +1,34 @@
 /*
- * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
-/* LEDs */
-#define LED_TX          CONFIG_BRIDGE_GPIO_LED1
-#define LED_RX          CONFIG_BRIDGE_GPIO_LED2
-#define LED_JTAG        CONFIG_BRIDGE_GPIO_LED3
+#include <stdbool.h>
 
-#define LED_TX_ON       CONFIG_BRIDGE_GPIO_LED1_ACTIVE
-#define LED_TX_OFF      (!CONFIG_BRIDGE_GPIO_LED1_ACTIVE)
+typedef enum {
+    LED_IO_TX = 0,  // LED1
+    LED_IO_RX,      // LED2
+    LED_IO_JTAG,    // LED3
+} led_io_t;
 
-#define LED_RX_ON       CONFIG_BRIDGE_GPIO_LED2_ACTIVE
-#define LED_RX_OFF      (!CONFIG_BRIDGE_GPIO_LED2_ACTIVE)
+/**
+ * @brief Initialize the status LEDs (discrete GPIO LEDs or the WS2812 RGB LED)
+ *
+ * Must be called before any other led_io function.
+ */
+void led_io_init(void);
 
-#define LED_JTAG_ON     CONFIG_BRIDGE_GPIO_LED3_ACTIVE
-#define LED_JTAG_OFF    (!CONFIG_BRIDGE_GPIO_LED3_ACTIVE)
+/**
+ * @brief Turn one status LED on or off
+ *
+ * Safe to call from multiple tasks.
+ */
+void led_io_set(led_io_t led, bool on);
+
+/**
+ * @brief Set all status LEDs at once
+ */
+void led_io_set_all(bool tx, bool rx, bool jtag);

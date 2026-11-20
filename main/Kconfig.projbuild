@@ -63,6 +63,29 @@ menu "Bridge Configuration"
         help
             Logic level when LED3 is active (0=active low, 1=active high)
 
+    config BRIDGE_USE_RGB_LED
+        bool "Use addressable WS2812 RGB status LED"
+        default n
+        help
+            Use a single WS2812 RGB LED instead of the three GPIO LEDs (LED1-LED3).
+            Blue shows serial data from the host to the target, green shows serial
+            data from the target to the host, and red shows JTAG activity.
+
+    config BRIDGE_GPIO_RGB_LED
+        int "RGB LED GPIO number"
+        depends on BRIDGE_USE_RGB_LED
+        default 48
+        help
+            GPIO connected to the WS2812 RGB LED
+
+    config BRIDGE_BRIGHTNESS_RGB_LED
+        int "RGB LED brightness (0-255)"
+        depends on BRIDGE_USE_RGB_LED
+        range 0 255
+        default 20
+        help
+            Maximum brightness level for the WS2812 RGB LED (0 = off, 255 = full brightness).
+
     config BRIDGE_MSC_VOLUME_LABEL
         string "Volume label shown in the MSC disc"
         default "ESPPROG_MSC"

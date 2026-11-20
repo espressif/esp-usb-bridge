@@ -7,7 +7,7 @@ else()
     list(APPEND dependencies "driver")
 endif()
 
-idf_component_register(SRCS "util.c"
+idf_component_register(SRCS "util.c" "led_io.c"
                        INCLUDE_DIRS "include"
                        REQUIRES ${dependencies}
                       )

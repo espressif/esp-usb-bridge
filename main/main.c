@@ -125,7 +125,7 @@ uint8_t const *tud_descriptor_device_cb(void)
 
 static void debug_activity_callback(bool active)
 {
-    gpio_set_level(LED_JTAG, active ? LED_JTAG_ON : LED_JTAG_OFF);
+    led_io_set(LED_IO_JTAG, active);
 }
 
 void tud_mount_cb(void)
@@ -203,35 +203,17 @@ static void tusb_device_task(void *pvParameters)
 // LEDs TX and RX are swapped in the code to indicate activity from the bridge to the target
 static void serial_tx_activity_callback(bool active)
 {
-    gpio_set_level(LED_RX, active ? LED_RX_ON : LED_RX_OFF);
+    led_io_set(LED_IO_RX, active);
 }
 
 static void serial_rx_activity_callback(bool active)
 {
-    gpio_set_level(LED_TX, active ? LED_TX_ON : LED_TX_OFF);
-}
-
-static void init_led_gpios(void)
-{
-    gpio_config_t io_conf = {};
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL << CONFIG_BRIDGE_GPIO_LED1) | (1ULL << CONFIG_BRIDGE_GPIO_LED2) |
-                           (1ULL << CONFIG_BRIDGE_GPIO_LED3);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    ESP_ERROR_CHECK(gpio_config(&io_conf));
-
-    gpio_set_level(CONFIG_BRIDGE_GPIO_LED1, !CONFIG_BRIDGE_GPIO_LED1_ACTIVE);
-    gpio_set_level(CONFIG_BRIDGE_GPIO_LED2, !CONFIG_BRIDGE_GPIO_LED2_ACTIVE);
-    gpio_set_level(CONFIG_BRIDGE_GPIO_LED3, !CONFIG_BRIDGE_GPIO_LED3_ACTIVE);
-
-    ESP_LOGI(TAG, "LED GPIO init done");
+    led_io_set(LED_IO_TX, active);
 }
 
 void app_main(void)
 {
-    init_led_gpios(); // Keep this at the beginning. LEDs are used for error reporting.
+    led_io_init(); // Keep this at the beginning. LEDs are used for error reporting.
 
     init_serial_no();
 
